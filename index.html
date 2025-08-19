@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>장조 코드 피아노</title>
   <style>
     body {
@@ -15,22 +15,18 @@
       margin: 0;
       font-family: sans-serif;
     }
-
     h1 {
       margin-top: 20px;
     }
-
     select {
       margin: 20px;
       padding: 5px 10px;
       font-size: 16px;
     }
-
     .piano {
       display: flex;
       position: relative;
     }
-
     .key {
       width: 60px;
       height: 250px;
@@ -38,10 +34,9 @@
       background: white;
       position: relative;
       z-index: 1;
-      box-shadow: inset -2px 0 3px rgba(0,0,0,0.3);
+      box-shadow: inset -2px 0 3px rgba(0, 0, 0, 0.3);
       cursor: pointer;
     }
-
     .key.black {
       width: 40px;
       height: 160px;
@@ -50,17 +45,14 @@
       top: 0;
       z-index: 2;
       margin-left: -20px;
-      box-shadow: inset -2px 0 3px rgba(255,255,255,0.1);
+      box-shadow: inset -2px 0 3px rgba(255, 255, 255, 0.1);
     }
-
     .key:active {
       background: #ddd;
     }
-
     .key.black:active {
       background: #333;
     }
-
     .note-label {
       position: absolute;
       bottom: 5px;
@@ -69,24 +61,22 @@
       font-size: 14px;
       color: black;
     }
-
     .key.black .note-label {
       color: white;
     }
   </style>
 </head>
 <body>
-
   <h1>🎵 장조 코드 피아노</h1>
   <label for="scale">장조 선택:</label>
   <select id="scale">
-    <option value="C">다장조 (C)</option>
-    <option value="D">레장조 (D)</option>
-    <option value="E">미장조 (E)</option>
-    <option value="F">파장조 (F)</option>
-    <option value="G">솔장조 (G)</option>
-    <option value="A">라장조 (A)</option>
-    <option value="B">시장조 (B)</option>
+    <option value="C">도 - 다장조</option>
+    <option value="D">레 - 라장조</option>
+    <option value="E">미 - 마장조</option>
+    <option value="F">파 - 바장조</option>
+    <option value="G">솔 - 사장조</option>
+    <option value="A">라 - 가장조</option>
+    <option value="B">시 - 나장조</option>
   </select>
 
   <div class="piano" id="piano">
@@ -119,13 +109,9 @@
       'B': 'B.mp3'
     };
 
-    // 음 순서
     const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const majorScaleChords = [0, 2, 4, 5, 7, 9, 11];
 
-    // 다이어토닉 장조 코드 (I ii iii IV V vi vii°)
-    const majorScaleChords = [0, 2, 4, 5, 7, 9, 11]; // 상대 음 위치
-
-    // 코드 구성 음 (메이저/마이너/디미니쉬)
     function getChordNotes(rootIndex, type) {
       let intervals;
       if (type === 'maj') intervals = [0, 4, 7];
@@ -138,17 +124,13 @@
     function getScaleChords(keyNote) {
       const keyIndex = NOTES.indexOf(keyNote);
       const scale = majorScaleChords.map(step => (keyIndex + step) % 12);
-
-      // 코드 타입: I, ii, iii, IV, V, vi, vii°
       const types = ['maj', 'min', 'min', 'maj', 'maj', 'min', 'dim'];
       const chords = {};
-
       for (let i = 0; i < scale.length; i++) {
         const root = NOTES[scale[i]];
         const chord = getChordNotes(scale[i], types[i]);
         chords[root] = chord;
       }
-
       return chords;
     }
 
@@ -171,7 +153,6 @@
             audio.play();
           });
         } else {
-          // 단일음 (코드에 없는 음)
           const audio = new Audio(audioBase + noteFiles[note]);
           audio.play();
         }
