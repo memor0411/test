@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>가상 피아노</title>
+  <style>
+    body {
+      background: #222;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      font-family: sans-serif;
+    }
+
+    .piano {
+      display: flex;
+      position: relative;
+    }
+
+    .key {
+      width: 60px;
+      height: 250px;
+      border: 1px solid #000;
+      background: white;
+      position: relative;
+      z-index: 1;
+      box-shadow: inset -2px 0 3px rgba(0,0,0,0.3);
+      cursor: pointer;
+    }
+
+    .key.black {
+      width: 40px;
+      height: 160px;
+      background: black;
+      position: absolute;
+      top: 0;
+      z-index: 2;
+      margin-left: -20px;
+      box-shadow: inset -2px 0 3px rgba(255,255,255,0.1);
+    }
+
+    .key:active {
+      background: #ddd;
+    }
+
+    .key.black:active {
+      background: #333;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="piano">
+    <!-- White keys -->
+    <div class="key" data-note="C"></div>
+    <div class="key" data-note="D"></div>
+    <div class="key" data-note="E"></div>
+    <div class="key" data-note="F"></div>
+    <div class="key" data-note="G"></div>
+    <div class="key" data-note="A"></div>
+    <div class="key" data-note="B"></div>
+
+    <!-- Black keys -->
+    <div class="key black" style="left: 45px;" data-note="C#"></div>
+    <div class="key black" style="left: 105px;" data-note="D#"></div>
+    <div class="key black" style="left: 225px;" data-note="F#"></div>
+    <div class="key black" style="left: 285px;" data-note="G#"></div>
+    <div class="key black" style="left: 345px;" data-note="A#"></div>
+  </div>
+
+  <script>
+    // 사운드 파일 URL (프리 사운드 사용)
+    const notes = {
+      'C': 'https://piano-sounds.s3.us-east-2.amazonaws.com/C.mp3',
+      'C#': 'https://piano-sounds.s3.us-east-2.amazonaws.com/Cs.mp3',
+      'D': 'https://piano-sounds.s3.us-east-2.amazonaws.com/D.mp3',
+      'D#': 'https://piano-sounds.s3.us-east-2.amazonaws.com/Ds.mp3',
+      'E': 'https://piano-sounds.s3.us-east-2.amazonaws.com/E.mp3',
+      'F': 'https://piano-sounds.s3.us-east-2.amazonaws.com/F.mp3',
+      'F#': 'https://piano-sounds.s3.us-east-2.amazonaws.com/Fs.mp3',
+      'G': 'https://piano-sounds.s3.us-east-2.amazonaws.com/G.mp3',
+      'G#': 'https://piano-sounds.s3.us-east-2.amazonaws.com/Gs.mp3',
+      'A': 'https://piano-sounds.s3.us-east-2.amazonaws.com/A.mp3',
+      'A#': 'https://piano-sounds.s3.us-east-2.amazonaws.com/As.mp3',
+      'B': 'https://piano-sounds.s3.us-east-2.amazonaws.com/B.mp3',
+    };
+
+    document.querySelectorAll('.key').forEach(key => {
+      key.addEventListener('click', () => {
+        const note = key.dataset.note;
+        const audio = new Audio(notes[note]);
+        audio.play();
+      });
+    });
+  </script>
+
+</body>
+</html>
