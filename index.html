@@ -1,4 +1,183 @@
-<strong>hello </strong> world!
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>장조 코드 피아노</title>
+  <style>
+    body {
+      background: #222;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      height: 100vh;
+      margin: 0;
+      font-family: sans-serif;
+    }
 
-<iframe width="914" height="514" src="https://www.youtube.com/embed/Eakt1tkxIXc?list=RDEakt1tkxIXc" title="Loose" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+    h1 {
+      margin-top: 20px;
+    }
 
+    select {
+      margin: 20px;
+      padding: 5px 10px;
+      font-size: 16px;
+    }
+
+    .piano {
+      display: flex;
+      position: relative;
+    }
+
+    .key {
+      width: 60px;
+      height: 250px;
+      border: 1px solid #000;
+      background: white;
+      position: relative;
+      z-index: 1;
+      box-shadow: inset -2px 0 3px rgba(0,0,0,0.3);
+      cursor: pointer;
+    }
+
+    .key.black {
+      width: 40px;
+      height: 160px;
+      background: black;
+      position: absolute;
+      top: 0;
+      z-index: 2;
+      margin-left: -20px;
+      box-shadow: inset -2px 0 3px rgba(255,255,255,0.1);
+    }
+
+    .key:active {
+      background: #ddd;
+    }
+
+    .key.black:active {
+      background: #333;
+    }
+
+    .note-label {
+      position: absolute;
+      bottom: 5px;
+      width: 100%;
+      text-align: center;
+      font-size: 14px;
+      color: black;
+    }
+
+    .key.black .note-label {
+      color: white;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🎵 장조 코드 피아노</h1>
+  <label for="scale">장조 선택:</label>
+  <select id="scale">
+    <option value="C">다장조 (C)</option>
+    <option value="D">레장조 (D)</option>
+    <option value="E">미장조 (E)</option>
+    <option value="F">파장조 (F)</option>
+    <option value="G">솔장조 (G)</option>
+    <option value="A">라장조 (A)</option>
+    <option value="B">시장조 (B)</option>
+  </select>
+
+  <div class="piano" id="piano">
+    <!-- White keys -->
+    <div class="key" data-note="C"><div class="note-label">C</div></div>
+    <div class="key" data-note="D"><div class="note-label">D</div></div>
+    <div class="key" data-note="E"><div class="note-label">E</div></div>
+    <div class="key" data-note="F"><div class="note-label">F</div></div>
+    <div class="key" data-note="G"><div class="note-label">G</div></div>
+    <div class="key" data-note="A"><div class="note-label">A</div></div>
+    <div class="key" data-note="B"><div class="note-label">B</div></div>
+
+    <!-- Black keys -->
+    <div class="key black" style="left: 45px;" data-note="C#"><div class="note-label">C#</div></div>
+    <div class="key black" style="left: 105px;" data-note="D#"><div class="note-label">D#</div></div>
+    <div class="key black" style="left: 225px;" data-note="F#"><div class="note-label">F#</div></div>
+    <div class="key black" style="left: 285px;" data-note="G#"><div class="note-label">G#</div></div>
+    <div class="key black" style="left: 345px;" data-note="A#"><div class="note-label">A#</div></div>
+  </div>
+
+  <script>
+    const audioBase = 'https://piano-sounds.s3.us-east-2.amazonaws.com/';
+    const noteFiles = {
+      'C': 'C.mp3', 'C#': 'Cs.mp3',
+      'D': 'D.mp3', 'D#': 'Ds.mp3',
+      'E': 'E.mp3',
+      'F': 'F.mp3', 'F#': 'Fs.mp3',
+      'G': 'G.mp3', 'G#': 'Gs.mp3',
+      'A': 'A.mp3', 'A#': 'As.mp3',
+      'B': 'B.mp3'
+    };
+
+    // 음 순서
+    const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+    // 다이어토닉 장조 코드 (I ii iii IV V vi vii°)
+    const majorScaleChords = [0, 2, 4, 5, 7, 9, 11]; // 상대 음 위치
+
+    // 코드 구성 음 (메이저/마이너/디미니쉬)
+    function getChordNotes(rootIndex, type) {
+      let intervals;
+      if (type === 'maj') intervals = [0, 4, 7];
+      else if (type === 'min') intervals = [0, 3, 7];
+      else if (type === 'dim') intervals = [0, 3, 6];
+
+      return intervals.map(i => NOTES[(rootIndex + i) % 12]);
+    }
+
+    function getScaleChords(keyNote) {
+      const keyIndex = NOTES.indexOf(keyNote);
+      const scale = majorScaleChords.map(step => (keyIndex + step) % 12);
+
+      // 코드 타입: I, ii, iii, IV, V, vi, vii°
+      const types = ['maj', 'min', 'min', 'maj', 'maj', 'min', 'dim'];
+      const chords = {};
+
+      for (let i = 0; i < scale.length; i++) {
+        const root = NOTES[scale[i]];
+        const chord = getChordNotes(scale[i], types[i]);
+        chords[root] = chord;
+      }
+
+      return chords;
+    }
+
+    let currentKey = 'C';
+    let currentChords = getScaleChords(currentKey);
+
+    document.getElementById('scale').addEventListener('change', (e) => {
+      currentKey = e.target.value;
+      currentChords = getScaleChords(currentKey);
+    });
+
+    document.querySelectorAll('.key').forEach(key => {
+      key.addEventListener('click', () => {
+        const note = key.dataset.note;
+        const chord = currentChords[note];
+
+        if (chord) {
+          chord.forEach(n => {
+            const audio = new Audio(audioBase + noteFiles[n]);
+            audio.play();
+          });
+        } else {
+          // 단일음 (코드에 없는 음)
+          const audio = new Audio(audioBase + noteFiles[note]);
+          audio.play();
+        }
+      });
+    });
+  </script>
+
+</body>
+</html>
