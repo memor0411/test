@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>가상 피아노</title>
+  <title>가상 피아노 🎹</title>
   <style>
     body {
       background: #222;
@@ -12,6 +12,7 @@
       height: 100vh;
       margin: 0;
       font-family: sans-serif;
+      user-select: none;
     }
 
     .piano {
@@ -28,6 +29,7 @@
       z-index: 1;
       box-shadow: inset -2px 0 3px rgba(0,0,0,0.3);
       cursor: pointer;
+      transition: background 0.1s;
     }
 
     .key.black {
@@ -41,12 +43,38 @@
       box-shadow: inset -2px 0 3px rgba(255,255,255,0.1);
     }
 
-    .key:active {
+    .key:active,
+    .key.active {
       background: #ddd;
     }
 
-    .key.black:active {
+    .key.black:active,
+    .key.black.active {
       background: #333;
+    }
+
+    .note-label {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 14px;
+      color: #333;
+    }
+
+    .key.black .note-label {
+      color: #fff;
+      bottom: 5px;
+      font-size: 12px;
+    }
+
+    .key-label {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      opacity: 0.6;
     }
   </style>
 </head>
@@ -54,45 +82,66 @@
 
   <div class="piano">
     <!-- White keys -->
-    <div class="key" data-note="C"></div>
-    <div class="key" data-note="D"></div>
-    <div class="key" data-note="E"></div>
-    <div class="key" data-note="F"></div>
-    <div class="key" data-note="G"></div>
-    <div class="key" data-note="A"></div>
-    <div class="key" data-note="B"></div>
+    <div class="key" data-note="C" data-key="a"><div class="note-label">C</div><div class="key-label">A</div></div>
+    <div class="key" data-note="D" data-key="s"><div class="note-label">D</div><div class="key-label">S</div></div>
+    <div class="key" data-note="E" data-key="d"><div class="note-label">E</div><div class="key-label">D</div></div>
+    <div class="key" data-note="F" data-key="f"><div class="note-label">F</div><div class="key-label">F</div></div>
+    <div class="key" data-note="G" data-key="g"><div class="note-label">G</div><div class="key-label">G</div></div>
+    <div class="key" data-note="A" data-key="h"><div class="note-label">A</div><div class="key-label">H</div></div>
+    <div class="key" data-note="B" data-key="j"><div class="note-label">B</div><div class="key-label">J</div></div>
 
     <!-- Black keys -->
-    <div class="key black" style="left: 45px;" data-note="C#"></div>
-    <div class="key black" style="left: 105px;" data-note="D#"></div>
-    <div class="key black" style="left: 225px;" data-note="F#"></div>
-    <div class="key black" style="left: 285px;" data-note="G#"></div>
-    <div class="key black" style="left: 345px;" data-note="A#"></div>
+    <div class="key black" style="left: 45px;" data-note="C#" data-key="w"><div class="note-label">C#</div><div class="key-label">W</div></div>
+    <div class="key black" style="left: 105px;" data-note="D#" data-key="e"><div class="note-label">D#</div><div class="key-label">E</div></div>
+    <div class="key black" style="left: 225px;" data-note="F#" data-key="t"><div class="note-label">F#</div><div class="key-label">T</div></div>
+    <div class="key black" style="left: 285px;" data-note="G#" data-key="y"><div class="note-label">G#</div><div class="key-label">Y</div></div>
+    <div class="key black" style="left: 345px;" data-note="A#" data-key="u"><div class="note-label">A#</div><div class="key-label">U</div></div>
   </div>
 
   <script>
-    // 사운드 파일 URL (프리 사운드 사용)
+    // ✅ 피아노 음원 (공개 CDN)
+    const base = "https://cdn.jsdelivr.net/gh/gleitz/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/";
     const notes = {
-      'C': 'https://piano-sounds.s3.us-east-2.amazonaws.com/C.mp3',
-      'C#': 'https://piano-sounds.s3.us-east-2.amazonaws.com/Cs.mp3',
-      'D': 'https://piano-sounds.s3.us-east-2.amazonaws.com/D.mp3',
-      'D#': 'https://piano-sounds.s3.us-east-2.amazonaws.com/Ds.mp3',
-      'E': 'https://piano-sounds.s3.us-east-2.amazonaws.com/E.mp3',
-      'F': 'https://piano-sounds.s3.us-east-2.amazonaws.com/F.mp3',
-      'F#': 'https://piano-sounds.s3.us-east-2.amazonaws.com/Fs.mp3',
-      'G': 'https://piano-sounds.s3.us-east-2.amazonaws.com/G.mp3',
-      'G#': 'https://piano-sounds.s3.us-east-2.amazonaws.com/Gs.mp3',
-      'A': 'https://piano-sounds.s3.us-east-2.amazonaws.com/A.mp3',
-      'A#': 'https://piano-sounds.s3.us-east-2.amazonaws.com/As.mp3',
-      'B': 'https://piano-sounds.s3.us-east-2.amazonaws.com/B.mp3',
+      'C': base + "C4.mp3",
+      'C#': base + "Cs4.mp3",
+      'D': base + "D4.mp3",
+      'D#': base + "Ds4.mp3",
+      'E': base + "E4.mp3",
+      'F': base + "F4.mp3",
+      'F#': base + "Fs4.mp3",
+      'G': base + "G4.mp3",
+      'G#': base + "Gs4.mp3",
+      'A': base + "A4.mp3",
+      'A#': base + "As4.mp3",
+      'B': base + "B4.mp3",
     };
 
+    function playNote(note) {
+      const audio = new Audio(notes[note]);
+      audio.currentTime = 0;
+      audio.play();
+    }
+
+    // 🎵 마우스로 클릭할 때
     document.querySelectorAll('.key').forEach(key => {
       key.addEventListener('click', () => {
         const note = key.dataset.note;
-        const audio = new Audio(notes[note]);
-        audio.play();
+        playNote(note);
       });
+    });
+
+    // 🎹 키보드로 눌렀을 때
+    document.addEventListener('keydown', e => {
+      const key = document.querySelector(`.key[data-key="${e.key.toLowerCase()}"]`);
+      if (key && !key.classList.contains('active')) {
+        key.classList.add('active');
+        playNote(key.dataset.note);
+      }
+    });
+
+    document.addEventListener('keyup', e => {
+      const key = document.querySelector(`.key[data-key="${e.key.toLowerCase()}"]`);
+      if (key) key.classList.remove('active');
     });
   </script>
 
