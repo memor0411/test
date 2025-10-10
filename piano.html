@@ -2,191 +2,278 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>가상 피아노 🎹</title>
+  <title>🎹 가상 피아노</title>
   <style>
     body {
       background: #222;
       color: white;
+      font-family: sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       height: 100vh;
       margin: 0;
-      font-family: sans-serif;
       user-select: none;
     }
-
-    h1 {
-      margin-bottom: 10px;
+    h1 { margin-bottom: 10px; }
+    #startButton {
+      padding: 10px 20px;
+      background: #4caf50;
+      color: white;
+      font-size: 18px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
     }
+    #startButton:hover { background: #66bb6a; }
 
-    select {
+    .controls {
+      display: none;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-bottom: 15px;
+      justify-content: center;
+      align-items: center;
+    }
+    select, button {
       padding: 6px 10px;
       font-size: 16px;
-      margin-bottom: 20px;
       border-radius: 5px;
       border: none;
+      cursor: pointer;
     }
+    button.active { background: #4caf50; color: white; }
 
     .piano {
-      display: flex;
+      display: none;
       position: relative;
+      height: 250px;
     }
-
-    .key {
+    .white-key {
       width: 60px;
       height: 250px;
-      border: 1px solid #000;
       background: white;
-      position: relative;
-      z-index: 1;
+      border: 1px solid #000;
       box-shadow: inset -2px 0 3px rgba(0,0,0,0.3);
       cursor: pointer;
-      transition: background 0.1s;
+      z-index: 1;
+      position: relative;
     }
-
-    .key.black {
+    .black-key {
+      position: absolute;
       width: 40px;
       height: 160px;
       background: black;
-      position: absolute;
-      top: 0;
-      z-index: 2;
+      border: 1px solid #000;
       margin-left: -20px;
+      z-index: 2;
       box-shadow: inset -2px 0 3px rgba(255,255,255,0.1);
+      cursor: pointer;
     }
 
-    .key:active,
-    .key.active {
-      background: #ddd;
-    }
-
-    .key.black:active,
-    .key.black.active {
-      background: #333;
-    }
-
-    .note-label {
-      position: absolute;
-      bottom: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 14px;
-      color: #333;
-    }
-
-    .key.black .note-label {
-      color: #fff;
-      bottom: 5px;
-      font-size: 12px;
-    }
+    .highlight-root { box-shadow: 0 0 12px 4px rgba(255,200,0,0.8); }
+    .highlight-chord { box-shadow: 0 0 8px 3px rgba(100,200,255,0.7); }
   </style>
 </head>
 <body>
 
-  <h1>🎵 가상 피아노</h1>
-  <label for="octaveSelect">옥타브 선택:</label>
-  <select id="octaveSelect">
-    <option value="2">2 옥타브</option>
-    <option value="3">3 옥타브</option>
-  </select>
+  <h1>🎹 가상 피아노</h1>
+  <button id="startButton">🎵 피아노 시작하기</button>
+
+  <div class="controls" id="controls">
+    <label>옥타브:</label>
+    <select id="octaveSelect">
+      <option value="2">2 옥타브</option>
+      <option value="3">3 옥타브</option>
+    </select>
+
+    <label>조성:</label>
+    <select id="keySelect">
+      <option value="C">C</option>
+      <option value="D">D</option>
+      <option value="E">E</option>
+      <option value="F">F</option>
+      <option value="G">G</option>
+      <option value="A">A</option>
+      <option value="B">B</option>
+    </select>
+
+    <label>음계:</label>
+    <button id="scaleMajor" class="active">장조</button>
+    <button id="scaleMinor">단조</button>
+
+    <label>코드:</label>
+    <button id="modeDiatonic" class="active">다이아토닉</button>
+    <button id="modeMajor">메이저</button>
+  </div>
 
   <div class="piano" id="piano"></div>
 
   <script>
-    const base = "https://cdn.jsdelivr.net/gh/gleitz/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/";
+    const baseURL = "https://cdn.jsdelivr.net/gh/gleitz/midi-js-soundfonts@gh-pages/FluidR3_GM/acoustic_grand_piano-mp3/";
+    const allNotes = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+    const semitoneMap = { "C":0,"C#":1,"D":2,"D#":3,"E":4,"F":5,"F#":6,"G":7,"G#":8,"A":9,"A#":10,"B":11 };
 
-    // 각 옥타브 음계 정의
-    const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    let audioCtx;
+    const audioBuffers = {};
+    let currentKey = "C";
+    let scaleType = "major";
+    let mode = "diatonic";
+    let octaves = 2;
+    let isReady = false;
 
-    // 키보드 매핑 (기본 1옥타브 기준)
-    const keyboardMap = [
-      "a","w","s","e","d","f","t","g","y","h","u","j",
-      "k","o","l","p",";","'","[","]"
-    ];
+    const mapNoteToFile = n => n.replace("#", "s");
+    const getNoteURL = (n, o) => `${baseURL}${mapNoteToFile(n)}${o}.mp3`;
 
-    // 음원 경로 생성
-    function getNoteURL(note, octave) {
-      const name = note.replace("#", "s");
-      return `${base}${name}${octave}.mp3`;
+    async function loadNote(note, octave) {
+      const res = await fetch(getNoteURL(note, octave));
+      const buf = await res.arrayBuffer();
+      audioBuffers[`${note}${octave}`] = await audioCtx.decodeAudioData(buf);
     }
 
-    // 피아노 렌더링
-    function renderPiano(octaves = 2) {
-      const piano = document.getElementById("piano");
-      piano.innerHTML = ""; // 초기화
-
-      let keyIndex = 0;
+    async function preloadAll() {
+      const tasks = [];
       for (let o = 3; o < 3 + octaves; o++) {
-        noteNames.forEach(note => {
-          const key = document.createElement("div");
-          key.classList.add("key");
-          key.dataset.note = `${note}${o}`;
-          key.dataset.octave = o;
-          key.dataset.sound = getNoteURL(note, o);
+        for (const n of allNotes) tasks.push(loadNote(n, o));
+      }
+      await Promise.all(tasks);
+      isReady = true;
+      console.log("✅ 모든 음 로드 완료");
+    }
 
-          // 키보드 매핑
-          if (keyboardMap[keyIndex]) key.dataset.key = keyboardMap[keyIndex];
-          keyIndex++;
+    function playSound(note, octave) {
+      if (!isReady) return;
+      const key = `${note}${octave}`;
+      const buffer = audioBuffers[key];
+      if (!buffer) return;
+      const src = audioCtx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(audioCtx.destination);
+      src.start();
+    }
 
-          const label = document.createElement("div");
-          label.classList.add("note-label");
-          label.textContent = note + o;
-          key.appendChild(label);
+    function getMajorChord(root) {
+      const i = semitoneMap[root];
+      return [root, allNotes[(i+4)%12], allNotes[(i+7)%12]];
+    }
 
-          piano.appendChild(key);
+    function getScale(key, type) {
+      const major = [2,2,1,2,2,2,1];
+      const minor = [2,1,2,2,1,2,2];
+      const pattern = type==="minor"?minor:major;
+      let i = semitoneMap[key];
+      const scale=[key];
+      for (let p of pattern) {
+        i=(i+p)%12; scale.push(allNotes[i]);
+      }
+      return scale.slice(0,7);
+    }
+
+    function getDiatonicChord(root, key, type){
+      const scale=getScale(key,type);
+      const idx=scale.indexOf(root);
+      if(idx===-1) return getMajorChord(root);
+      return [root, scale[(idx+2)%scale.length], scale[(idx+4)%scale.length]];
+    }
+
+    function playChord(el){
+      const noteFull=el.dataset.note;
+      const note=noteFull.slice(0,-1);
+      const octave=parseInt(noteFull.slice(-1));
+      const chord=(mode==="major")?getMajorChord(note):getDiatonicChord(note,currentKey,scaleType);
+
+      chord.forEach((n,i)=>{
+        const r=semitoneMap[note], ni=semitoneMap[n]; 
+        let o=octave;
+        if(ni<r && i!==0) o+=1;
+        playSound(n,o);
+      });
+
+      highlightChord(chord,note);
+    }
+
+    function highlightChord(chord, root){
+      document.querySelectorAll(".white-key,.black-key").forEach(k=>k.classList.remove("highlight-root","highlight-chord"));
+      chord.forEach(n=>{
+        document.querySelectorAll(`[data-note^="${n}"]`).forEach(k=>{
+          if(n===root)k.classList.add("highlight-root");
+          else k.classList.add("highlight-chord");
         });
-      }
+      });
+      setTimeout(()=>{
+        document.querySelectorAll(".highlight-root,.highlight-chord").forEach(k=>k.classList.remove("highlight-root","highlight-chord"));
+      },700);
+    }
 
-      // 블랙 키 스타일 위치 조정
-      const whites = piano.querySelectorAll(".key");
-      whites.forEach((key, i) => {
-        const note = key.dataset.note;
-        if (note.includes("#")) {
-          key.classList.add("black");
-          key.style.left = `${i * 60 - 20}px`;
+    function createPiano(){
+      const piano=document.getElementById("piano");
+      piano.innerHTML="";
+      const whiteNotes=["C","D","E","F","G","A","B"];
+      const blackOffsets={"C#":45,"D#":105,"F#":225,"G#":285,"A#":345};
+      let whiteCount=0;
+
+      for(let o=3;o<3+octaves;o++){
+        for(const wn of whiteNotes){
+          const key=document.createElement("div");
+          key.className="white-key";
+          key.dataset.note=`${wn}${o}`;
+          piano.appendChild(key);
+          whiteCount++;
         }
-      });
-
-      // 화이트 키 배치
-      piano.querySelectorAll(".key:not(.black)").forEach((key, i) => {
-        key.style.marginLeft = "0";
-      });
-
-      // 클릭 이벤트 등록
-      document.querySelectorAll(".key").forEach(key => {
-        key.addEventListener("click", () => playNote(key));
-      });
-    }
-
-    // 소리 재생 함수
-    function playNote(key) {
-      const sound = key.dataset.sound;
-      const audio = new Audio(sound);
-      audio.currentTime = 0;
-      audio.play();
-
-      key.classList.add("active");
-      setTimeout(() => key.classList.remove("active"), 150);
-    }
-
-    // 키보드 이벤트
-    document.addEventListener("keydown", e => {
-      const key = document.querySelector(`.key[data-key="${e.key.toLowerCase()}"]`);
-      if (key && !key.classList.contains("active")) {
-        playNote(key);
+        for(const [bn,left] of Object.entries(blackOffsets)){
+          const key=document.createElement("div");
+          key.className="black-key";
+          key.dataset.note=`${bn}${o}`;
+          key.style.left=`${left+(whiteCount-7)*60}px`;
+          piano.appendChild(key);
+        }
       }
-    });
 
-    // 옥타브 변경 시 다시 렌더링
+      document.querySelectorAll(".white-key,.black-key").forEach(k=>{
+        k.addEventListener("click",()=>playChord(k));
+      });
+    }
+
+    // 이벤트 핸들러 연결
+    document.getElementById("keySelect").addEventListener("change", e => currentKey = e.target.value);
+    document.getElementById("scaleMajor").addEventListener("click", e => {
+      scaleType = "major";
+      e.target.classList.add("active");
+      document.getElementById("scaleMinor").classList.remove("active");
+    });
+    document.getElementById("scaleMinor").addEventListener("click", e => {
+      scaleType = "minor";
+      e.target.classList.add("active");
+      document.getElementById("scaleMajor").classList.remove("active");
+    });
+    document.getElementById("modeDiatonic").addEventListener("click", e => {
+      mode = "diatonic";
+      e.target.classList.add("active");
+      document.getElementById("modeMajor").classList.remove("active");
+    });
+    document.getElementById("modeMajor").addEventListener("click", e => {
+      mode = "major";
+      e.target.classList.add("active");
+      document.getElementById("modeDiatonic").classList.remove("active");
+    });
     document.getElementById("octaveSelect").addEventListener("change", e => {
-      renderPiano(parseInt(e.target.value));
+      octaves = parseInt(e.target.value);
+      createPiano();
+      preloadAll();
     });
 
-    // 기본 2옥타브로 시작
-    renderPiano(2);
+    // 시작 버튼
+    document.getElementById("startButton").addEventListener("click", async ()=>{
+      audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+      await audioCtx.resume();
+      document.getElementById("startButton").style.display="none";
+      document.getElementById("controls").style.display="flex";
+      document.getElementById("piano").style.display="flex";
+      createPiano();
+      await preloadAll();
+      alert("🎹 피아노 준비 완료! 이제 연주할 수 있습니다.");
+    });
   </script>
-
 </body>
 </html>
