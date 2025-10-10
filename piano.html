@@ -6,13 +6,27 @@
   <style>
     body {
       background: #222;
+      color: white;
       display: flex;
-      justify-content: center;
+      flex-direction: column;
       align-items: center;
+      justify-content: center;
       height: 100vh;
       margin: 0;
       font-family: sans-serif;
       user-select: none;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+
+    select {
+      padding: 6px 10px;
+      font-size: 16px;
+      margin-bottom: 20px;
+      border-radius: 5px;
+      border: none;
     }
 
     .piano {
@@ -67,82 +81,111 @@
       bottom: 5px;
       font-size: 12px;
     }
-
-    .key-label {
-      position: absolute;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 12px;
-      opacity: 0.6;
-    }
   </style>
 </head>
 <body>
 
-  <div class="piano">
-    <!-- White keys -->
-    <div class="key" data-note="C" data-key="a"><div class="note-label">C</div><div class="key-label">A</div></div>
-    <div class="key" data-note="D" data-key="s"><div class="note-label">D</div><div class="key-label">S</div></div>
-    <div class="key" data-note="E" data-key="d"><div class="note-label">E</div><div class="key-label">D</div></div>
-    <div class="key" data-note="F" data-key="f"><div class="note-label">F</div><div class="key-label">F</div></div>
-    <div class="key" data-note="G" data-key="g"><div class="note-label">G</div><div class="key-label">G</div></div>
-    <div class="key" data-note="A" data-key="h"><div class="note-label">A</div><div class="key-label">H</div></div>
-    <div class="key" data-note="B" data-key="j"><div class="note-label">B</div><div class="key-label">J</div></div>
+  <h1>🎵 가상 피아노</h1>
+  <label for="octaveSelect">옥타브 선택:</label>
+  <select id="octaveSelect">
+    <option value="2">2 옥타브</option>
+    <option value="3">3 옥타브</option>
+  </select>
 
-    <!-- Black keys -->
-    <div class="key black" style="left: 45px;" data-note="C#" data-key="w"><div class="note-label">C#</div><div class="key-label">W</div></div>
-    <div class="key black" style="left: 105px;" data-note="D#" data-key="e"><div class="note-label">D#</div><div class="key-label">E</div></div>
-    <div class="key black" style="left: 225px;" data-note="F#" data-key="t"><div class="note-label">F#</div><div class="key-label">T</div></div>
-    <div class="key black" style="left: 285px;" data-note="G#" data-key="y"><div class="note-label">G#</div><div class="key-label">Y</div></div>
-    <div class="key black" style="left: 345px;" data-note="A#" data-key="u"><div class="note-label">A#</div><div class="key-label">U</div></div>
-  </div>
+  <div class="piano" id="piano"></div>
 
   <script>
-    // ✅ 피아노 음원 (공개 CDN)
     const base = "https://cdn.jsdelivr.net/gh/gleitz/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/";
-    const notes = {
-      'C': base + "C4.mp3",
-      'C#': base + "Cs4.mp3",
-      'D': base + "D4.mp3",
-      'D#': base + "Ds4.mp3",
-      'E': base + "E4.mp3",
-      'F': base + "F4.mp3",
-      'F#': base + "Fs4.mp3",
-      'G': base + "G4.mp3",
-      'G#': base + "Gs4.mp3",
-      'A': base + "A4.mp3",
-      'A#': base + "As4.mp3",
-      'B': base + "B4.mp3",
-    };
 
-    function playNote(note) {
-      const audio = new Audio(notes[note]);
-      audio.currentTime = 0;
-      audio.play();
+    // 각 옥타브 음계 정의
+    const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
+    // 키보드 매핑 (기본 1옥타브 기준)
+    const keyboardMap = [
+      "a","w","s","e","d","f","t","g","y","h","u","j",
+      "k","o","l","p",";","'","[","]"
+    ];
+
+    // 음원 경로 생성
+    function getNoteURL(note, octave) {
+      const name = note.replace("#", "s");
+      return `${base}${name}${octave}.mp3`;
     }
 
-    // 🎵 마우스로 클릭할 때
-    document.querySelectorAll('.key').forEach(key => {
-      key.addEventListener('click', () => {
-        const note = key.dataset.note;
-        playNote(note);
-      });
-    });
+    // 피아노 렌더링
+    function renderPiano(octaves = 2) {
+      const piano = document.getElementById("piano");
+      piano.innerHTML = ""; // 초기화
 
-    // 🎹 키보드로 눌렀을 때
-    document.addEventListener('keydown', e => {
+      let keyIndex = 0;
+      for (let o = 3; o < 3 + octaves; o++) {
+        noteNames.forEach(note => {
+          const key = document.createElement("div");
+          key.classList.add("key");
+          key.dataset.note = `${note}${o}`;
+          key.dataset.octave = o;
+          key.dataset.sound = getNoteURL(note, o);
+
+          // 키보드 매핑
+          if (keyboardMap[keyIndex]) key.dataset.key = keyboardMap[keyIndex];
+          keyIndex++;
+
+          const label = document.createElement("div");
+          label.classList.add("note-label");
+          label.textContent = note + o;
+          key.appendChild(label);
+
+          piano.appendChild(key);
+        });
+      }
+
+      // 블랙 키 스타일 위치 조정
+      const whites = piano.querySelectorAll(".key");
+      whites.forEach((key, i) => {
+        const note = key.dataset.note;
+        if (note.includes("#")) {
+          key.classList.add("black");
+          key.style.left = `${i * 60 - 20}px`;
+        }
+      });
+
+      // 화이트 키 배치
+      piano.querySelectorAll(".key:not(.black)").forEach((key, i) => {
+        key.style.marginLeft = "0";
+      });
+
+      // 클릭 이벤트 등록
+      document.querySelectorAll(".key").forEach(key => {
+        key.addEventListener("click", () => playNote(key));
+      });
+    }
+
+    // 소리 재생 함수
+    function playNote(key) {
+      const sound = key.dataset.sound;
+      const audio = new Audio(sound);
+      audio.currentTime = 0;
+      audio.play();
+
+      key.classList.add("active");
+      setTimeout(() => key.classList.remove("active"), 150);
+    }
+
+    // 키보드 이벤트
+    document.addEventListener("keydown", e => {
       const key = document.querySelector(`.key[data-key="${e.key.toLowerCase()}"]`);
-      if (key && !key.classList.contains('active')) {
-        key.classList.add('active');
-        playNote(key.dataset.note);
+      if (key && !key.classList.contains("active")) {
+        playNote(key);
       }
     });
 
-    document.addEventListener('keyup', e => {
-      const key = document.querySelector(`.key[data-key="${e.key.toLowerCase()}"]`);
-      if (key) key.classList.remove('active');
+    // 옥타브 변경 시 다시 렌더링
+    document.getElementById("octaveSelect").addEventListener("change", e => {
+      renderPiano(parseInt(e.target.value));
     });
+
+    // 기본 2옥타브로 시작
+    renderPiano(2);
   </script>
 
 </body>
