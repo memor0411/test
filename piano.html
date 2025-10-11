@@ -1,224 +1,307 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
 <meta charset="utf-8" />
-<title>가상 피아노 (Web Audio API)</title>
+<title>가상 피아노 — 안정 재생 & F# 고정</title>
 <style>
-  body {
-    background: #222;
-    color: #fff;
-    font-family: sans-serif;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-    margin: 0;
-  }
-  #startButton { padding:10px 20px; background:#4caf50; border:none; border-radius:8px; color:white; font-size:16px; cursor:pointer; }
-  .controls { display:none; gap:10px; margin:12px 0; }
-  select, button { padding:6px 10px; border-radius:6px; border:none; cursor:pointer; }
-  button.active { background:#4caf50; color:white; }
-  .piano { display:none; position:relative; height:250px; }
-  .white-key { width:60px; height:250px; background:white; border:1px solid black; box-shadow:inset -2px 0 3px rgba(0,0,0,0.25); display:inline-block; position:relative; cursor:pointer; }
-  .black-key { position:absolute; width:40px; height:160px; background:black; z-index:2; border-radius:0 0 4px 4px; cursor:pointer; }
-  .note-label { position:absolute; left:50%; bottom:8px; transform:translateX(-50%); font-size:12px; color:#333; }
-  .highlight-root { box-shadow:0 0 15px 5px rgba(255, 220, 50, 0.9); }
-  .highlight-chord { box-shadow:0 0 10px 4px rgba(100, 200, 255, 0.8); }
+  :root { --white-w: 60px; --white-h: 250px; --black-w: 40px; --black-h: 160px; }
+  body{background:#222;color:#fff;font-family:system-ui,Segoe UI,Roboto;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:24px;min-height:100vh;box-sizing:border-box}
+  h1{margin:0 0 12px}
+  #startButton{padding:10px 18px;background:#4caf50;border:0;border-radius:8px;color:#fff;font-weight:600;cursor:pointer}
+  #controls{display:none;margin:12px 0;gap:10px;align-items:center}
+  select, button.control{padding:6px 10px;border-radius:6px;border:0;background:#eee;color:#111;cursor:pointer}
+  button.control.active{background:#4caf50;color:#fff}
+  #status{margin-top:8px;color:#ffd;}
+  /* piano layout */
+  #pianoWrap{display:none;margin-top:14px;position:relative;user-select:none}
+  .white-key{width:var(--white-w);height:var(--white-h);background:#fff;border:1px solid #000;box-sizing:border-box;display:inline-block;vertical-align:top;position:relative;cursor:pointer}
+  .black-key{position:absolute;width:var(--black-w);height:var(--black-h);background:#000;border-radius:0 0 6px 6px;z-index:2;cursor:pointer}
+  .note-label{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);font-size:12px;color:#333}
+  .highlight-root{box-shadow:0 0 14px 6px rgba(255,200,0,0.95)}
+  .highlight-chord{box-shadow:0 0 10px 5px rgba(100,200,255,0.85)}
+  #errors{margin-top:10px;color:#f88;max-width:900px;text-align:center;font-size:13px}
 </style>
 </head>
 <body>
-  <h1>🎹 가상 피아노 (실제 음원 작동 버전)</h1>
+  <h1>🎹 가상 피아노 (F#·검은키 ·동시 재생 수정)</h1>
   <button id="startButton">🎵 피아노 시작하기</button>
 
-  <div class="controls" id="controls">
+  <div id="controls">
     <label>옥타브:
-      <select id="octaveSelect">
-        <option value="2">2 옥타브</option>
-        <option value="3">3 옥타브</option>
-      </select>
+      <select id="octaveSelect"><option value="2">2 옥타브</option><option value="3">3 옥타브</option></select>
     </label>
+
     <label>조성:
-      <select id="keySelect">
-        <option>C</option><option>D</option><option>E</option><option>F</option><option>G</option><option>A</option><option>B</option>
-      </select>
+      <select id="keySelect"><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option><option>A</option><option>B</option></select>
     </label>
+
     <label>음계:
-      <button id="scaleMajor" class="active">장조</button>
-      <button id="scaleMinor">단조</button>
+      <button id="scaleMajor" class="control active">장조</button>
+      <button id="scaleMinor" class="control">단조</button>
     </label>
+
     <label>코드:
-      <button id="modeDiatonic" class="active">다이아토닉</button>
-      <button id="modeMajor">메이저</button>
+      <button id="modeDiatonic" class="control active">다이아토닉</button>
+      <button id="modeMajor" class="control">메이저</button>
     </label>
   </div>
 
-  <div id="status">버퍼 준비 전 — "피아노 시작하기" 버튼을 눌러주세요.</div>
-  <div class="piano" id="piano"></div>
+  <div id="status">버퍼 준비 전 — 시작 버튼을 눌러주세요.</div>
+  <div id="errors"></div>
+
+  <div id="pianoWrap"><div id="piano"></div></div>
 
 <script>
-const BASE_URL = "https://raw.githubusercontent.com/gleitz/midi-js-soundfonts/gh-pages/FluidR3_GM/acoustic_grand_piano-mp3/";
-const allNotes = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-const semitoneMap = {"C":0,"C#":1,"D":2,"D#":3,"E":4,"F":5,"F#":6,"G":7,"G#":8,"A":9,"A#":10,"B":11};
+/* ================== 설정 ================== */
+const BASE_PRIORITY = [
+  "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/",
+  "https://raw.githubusercontent.com/gleitz/midi-js-soundfonts/gh-pages/FluidR3_GM/acoustic_grand_piano-mp3/",
+  "https://cdn.jsdelivr.net/gh/gleitz/midi-js-soundfonts@gh-pages/FluidR3_GM/acoustic_grand_piano-mp3/"
+];
+const ALL_NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const SEMI = {"C":0,"C#":1,"D":2,"D#":3,"E":4,"F":5,"F#":6,"G":7,"G#":8,"A":9,"A#":10,"B":11};
+/* ========================================== */
 
-let audioCtx;
-let audioBuffers = {};
+let audioCtx = null;
+let audioBuffers = {}; // key: "C4" -> AudioBuffer
 let octaves = 2;
 let currentKey = "C";
-let scaleType = "major";
-let mode = "diatonic";
+let scaleType = "major"; // major | minor
+let mode = "diatonic"; // diatonic | major
 let isReady = false;
+const failedLoads = new Set();
+const statusEl = document.getElementById("status");
+const errorsEl = document.getElementById("errors");
 
-function logStatus(msg){ document.getElementById("status").textContent = msg; }
+function setStatus(text){ statusEl.textContent = text; }
+function reportError(text){ failedLoads.add(text); errorsEl.textContent = Array.from(failedLoads).slice(-6).join("  |  "); }
 
-async function loadAudio(note, octave) {
-  const name = note.replace("#","s");
-  const url = `${BASE_URL}${name}${octave}.mp3`;
-  try {
-    const res = await fetch(url);
-    const arr = await res.arrayBuffer();
-    const buffer = await audioCtx.decodeAudioData(arr);
-    audioBuffers[`${note}${octave}`] = buffer;
-  } catch (e) {
-    console.warn("음원 로드 실패:", url, e);
-  }
-}
+/* convert note name to filename used by these repos (Fs vs F#) */
+function noteToFileName(note){ return note.replace("#","s"); } // e.g. F# -> Fs
 
-async function preloadAll() {
-  logStatus("음원 로드 중...");
-  audioBuffers = {};
-  for (let o = 3; o < 3 + octaves; o++) {
-    for (const n of allNotes) {
-      await loadAudio(n, o);
+/* Try to load a single note from multiple base URLs (first-success) */
+async function tryLoadBuffer(note, octave){
+  const key = `${note}${octave}`;
+  if (audioBuffers[key]) return true;
+  for (const base of BASE_PRIORITY){
+    const filename = `${noteToFileName(note)}${octave}.mp3`;
+    const url = base + filename;
+    try{
+      const res = await fetch(url);
+      if (!res.ok) { continue; }
+      const arr = await res.arrayBuffer();
+      const buf = await audioCtx.decodeAudioData(arr.slice(0));
+      audioBuffers[key] = buf;
+      console.log("Loaded", key, "from", url);
+      return true;
+    }catch(e){
+      // try next base
+      // console.warn("load fail", url, e);
+      continue;
     }
   }
-  isReady = true;
-  logStatus("음원 로드 완료 ✅");
+  reportError(`로드 실패: ${key}`);
+  return false;
 }
 
-function playSound(note, octave) {
+/* Preload all needed notes (concurrent with limit) */
+async function preloadAll(){
+  setStatus("음원 로드 중... (이 작업이 끝나야 소리가 정상 재생됩니다)");
+  audioBuffers = {};
+  failedLoads.clear();
+  errorsEl.textContent = "";
+  const tasks = [];
+  for (let o = 3; o < 3 + octaves; o++){
+    for (const n of ALL_NOTES) tasks.push(() => tryLoadBuffer(n, o));
+  }
+  // concurrency limit
+  const concurrency = 8;
+  const results = [];
+  for (let i=0; i<tasks.length; i+=concurrency){
+    const batch = tasks.slice(i,i+concurrency).map(f => f());
+    await Promise.all(batch);
+    setStatus(`로딩 진행: ${Math.min(i+concurrency, tasks.length)}/${tasks.length}`);
+  }
+  isReady = true;
+  setStatus(`로드 완료 — 준비됨. (${Object.keys(audioBuffers).length}개 버퍼)`);
+}
+
+/* Create and play from AudioBuffer */
+function playFromBuffer(note, octave){
   const key = `${note}${octave}`;
-  const buffer = audioBuffers[key];
-  if (!buffer) return;
+  const buf = audioBuffers[key];
+  if (!buf){
+    reportError(`버퍼 없음: ${key}`);
+    return;
+  }
   const src = audioCtx.createBufferSource();
-  src.buffer = buffer;
+  src.buffer = buf;
   src.connect(audioCtx.destination);
   src.start();
 }
 
-function getMajorChord(root) {
-  const i = semitoneMap[root];
-  return [root, allNotes[(i+4)%12], allNotes[(i+7)%12]];
+/* Scale / chord helpers */
+function getMajorChord(root){ const i = SEMI[root]; return [root, ALL_NOTES[(i+4)%12], ALL_NOTES[(i+7)%12]]; }
+function getScale(key, type){
+  const majorPat=[2,2,1,2,2,2,1], minorPat=[2,1,2,2,1,2,2];
+  const pat = type==="minor"?minorPat:majorPat;
+  let i = SEMI[key]; const scale=[key];
+  for (const step of pat){ i=(i+step)%12; scale.push(ALL_NOTES[i]); }
+  return scale.slice(0,7);
 }
-
-function getScale(key, type) {
-  const major = [2,2,1,2,2,2,1];
-  const minor = [2,1,2,2,1,2,2];
-  const pat = type === "minor" ? minor : major;
-  let i = semitoneMap[key];
-  const arr = [key];
-  for (let p of pat) { i = (i+p)%12; arr.push(allNotes[i]); }
-  return arr.slice(0,7);
-}
-
 function getDiatonicChord(root, key, type){
-  const scale = getScale(key, type);
-  const idx = scale.indexOf(root);
+  const scale = getScale(key,type); const idx = scale.indexOf(root);
   if (idx === -1) return getMajorChord(root);
-  return [ root, scale[(idx+2)%scale.length], scale[(idx+4)%scale.length] ];
+  return [root, scale[(idx+2)%scale.length], scale[(idx+4)%scale.length]];
 }
 
-function highlightChord(chord, root) {
-  document.querySelectorAll(".white-key,.black-key").forEach(k=>{
-    k.classList.remove("highlight-root","highlight-chord");
-  });
-  chord.forEach(n=>{
-    document.querySelectorAll(`[data-note^="${n}"]`).forEach(k=>{
-      if (n === root) k.classList.add("highlight-root");
+/* Highlight visuals */
+function highlightChord(chord, root){
+  document.querySelectorAll(".white-key, .black-key").forEach(k => k.classList.remove("highlight-root","highlight-chord"));
+  chord.forEach(note => {
+    document.querySelectorAll(`[data-note^="${note}"]`).forEach(k => {
+      if (note === root) k.classList.add("highlight-root");
       else k.classList.add("highlight-chord");
     });
   });
-  setTimeout(()=>document.querySelectorAll(".highlight-root,.highlight-chord")
-    .forEach(k=>k.classList.remove("highlight-root","highlight-chord")), 700);
+  setTimeout(()=> document.querySelectorAll(".highlight-root, .highlight-chord").forEach(k=>k.classList.remove("highlight-root","highlight-chord")), 700);
 }
 
-function onKeyClick(el) {
+/* On-key click (async to allow on-demand loading fallback) */
+async function onKeyClicked(el){
   const noteFull = el.dataset.note;
-  const note = noteFull.slice(0,-1);
-  const octaveNum = parseInt(noteFull.slice(-1));
-  let chord = mode === "major" ? getMajorChord(note) : getDiatonicChord(note, currentKey, scaleType);
-  const rootIdx = semitoneMap[note];
-  chord.forEach((n,i)=>{
+  const root = noteFull.slice(0,-1);
+  let octaveNum = parseInt(noteFull.slice(-1),10);
+  const chord = mode === "major" ? getMajorChord(root) : getDiatonicChord(root, currentKey, scaleType);
+
+  // Ensure buffers exist (try to load on-demand if missing)
+  for (let i=0;i<chord.length;i++){
+    const n = chord[i];
+    // octave calc: if tone < root semitone (and not root) then raise octave
+    const rootIdx = SEMI[root], nIdx = SEMI[n];
     let oct = octaveNum;
-    if (i !== 0 && semitoneMap[n] < rootIdx) oct += 1;
-    playSound(n, oct);
+    if (i !== 0 && nIdx < rootIdx) oct += 1;
+
+    const key = `${n}${oct}`;
+    if (!audioBuffers[key]){
+      // attempt to load immediately (tryLoadBuffer uses audioCtx and BASE_PRIORITY)
+      await tryLoadBuffer(n, oct);
+    }
+  }
+
+  // play all chord tones now (simultaneously)
+  chord.forEach((n,i)=>{
+    const rootIdx = SEMI[root], nIdx = SEMI[n];
+    let oct = octaveNum;
+    if (i !== 0 && nIdx < rootIdx) oct += 1;
+    // if buffer missing still, skip but it's already attempted above
+    if (audioBuffers[`${n}${oct}`]) playFromBuffer(n, oct);
   });
-  highlightChord(chord, note);
-  logStatus(`${noteFull} → ${chord.join(" - ")}`);
+
+  highlightChord(chord, root);
+  setStatus(`${noteFull} → ${chord.join(' - ')}`);
 }
 
-function createPianoDom() {
+/* Piano DOM correct layout:
+   - white keys appended sequentially (width * count)
+   - black keys absolutely positioned over container with computed left offsets
+*/
+function createPiano(){
   const piano = document.getElementById("piano");
   piano.innerHTML = "";
   const whiteNotes = ["C","D","E","F","G","A","B"];
   const blackNotes = ["C#","D#", null, "F#","G#","A#", null];
-  for (let o = 3; o < 3 + octaves; o++) {
-    const group = document.createElement("div");
-    group.style.display = "inline-block";
-    group.style.position = "relative";
-    whiteNotes.forEach((wn,i)=>{
-      const w=document.createElement("div");
-      w.className="white-key";
-      w.dataset.note=`${wn}${o}`;
-      w.innerHTML=`<div class="note-label">${wn}${o}</div>`;
-      w.addEventListener("click",()=>onKeyClick(w));
-      group.appendChild(w);
-    });
-    blackNotes.forEach((bn,i)=>{
-      if(!bn)return;
-      const b=document.createElement("div");
-      b.className="black-key";
-      b.dataset.note=`${bn}${o}`;
-      b.style.left=`${(i+1)*60 - 20}px`;
-      b.innerHTML=`<div class="note-label">${bn}${o}</div>`;
-      b.addEventListener("click",()=>onKeyClick(b));
-      group.appendChild(b);
-    });
-    piano.appendChild(group);
+
+  const totalWhite = whiteNotes.length * octaves;
+  const totalWidth = totalWhite * 60;
+  const container = document.getElementById("pianoWrap");
+  const pianoEl = document.getElementById("piano");
+  pianoEl.style.width = totalWidth + "px";
+  pianoEl.style.position = "relative";
+  // add white keys in order
+  for (let o=0; o<octaves; o++){
+    const octaveNum = 3 + o;
+    for (let i=0;i<whiteNotes.length;i++){
+      const n = whiteNotes[i];
+      const idx = o*7 + i; // absolute white index
+      const div = document.createElement("div");
+      div.className = "white-key";
+      div.style.left = (idx * 60) + "px";
+      // make them inline-block visually; we want absolute-free flow so append differently:
+      // instead, append normal and use flow - simpler: append inline-block
+      // We'll append using inline flow; to keep absolute-coords consistent, use position:relative on parent
+      div.style.position = "absolute";
+      div.style.top = "0";
+      div.style.boxSizing = "border-box";
+      div.dataset.note = `${n}${octaveNum}`;
+      div.innerHTML = `<div class="note-label">${n}${octaveNum}</div>`;
+      div.addEventListener("click", ()=> onKeyClicked(div));
+      pianoEl.appendChild(div);
+    }
+  }
+  // add black keys positioned between white keys
+  // for each octave, black between: C#/D# -> offsets (0,1), etc.
+  for (let o=0; o<octaves; o++){
+    const octaveNum = 3 + o;
+    for (let i=0;i<blackNotes.length;i++){
+      const bn = blackNotes[i];
+      if (!bn) continue;
+      const whiteIndex = o*7 + i; // black sits after whiteIndex-th white key
+      const left = (whiteIndex * 60) + 45; // tuned offset
+      const b = document.createElement("div");
+      b.className = "black-key";
+      b.style.left = left + "px";
+      b.style.top = "0px";
+      b.dataset.note = `${bn}${octaveNum}`;
+      b.innerHTML = `<div class="note-label">${bn}${octaveNum}</div>`;
+      b.addEventListener("click", ()=> onKeyClicked(b));
+      pianoEl.appendChild(b);
+    }
   }
 }
 
-document.getElementById("startButton").addEventListener("click", async ()=>{
-  audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-  await audioCtx.resume();
-  document.getElementById("startButton").style.display="none";
-  document.getElementById("controls").style.display="flex";
-  document.getElementById("piano").style.display="block";
-  createPianoDom();
+/* ========== start button handler ========== */
+document.getElementById("startButton").addEventListener("click", async () => {
+  // create/resume audio context on user gesture
+  try{
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    await audioCtx.resume();
+  }catch(e){
+    alert("브라우저에서 AudioContext 생성 실패: " + e);
+    console.error(e);
+    return;
+  }
+
+  // show controls + piano
+  document.getElementById("startButton").style.display = "none";
+  document.getElementById("controls").style.display = "flex";
+  document.getElementById("pianoWrap").style.display = "block";
+
+  // create piano DOM and preload all files
+  createPiano();
+  setStatus("오디오 컨텍스트 준비됨 — 음원 로드 시작");
   await preloadAll();
 });
 
-document.getElementById("octaveSelect").addEventListener("change", e=>{
-  octaves = parseInt(e.target.value);
-  createPianoDom();
-  preloadAll();
+/* ========== control bindings ========== */
+document.getElementById("octaveSelect").addEventListener("change", async (e)=>{
+  octaves = parseInt(e.target.value,10);
+  createPiano();
+  isReady = false;
+  await preloadAll();
 });
-document.getElementById("keySelect").addEventListener("change", e=>currentKey=e.target.value);
-document.getElementById("scaleMajor").addEventListener("click", e=>{
-  scaleType="major"; e.target.classList.add("active");
-  document.getElementById("scaleMinor").classList.remove("active");
+document.getElementById("keySelect").addEventListener("change", e => currentKey = e.target.value);
+document.getElementById("scaleMajor").addEventListener("click", e => {
+  scaleType = "major"; e.target.classList.add("active"); document.getElementById("scaleMinor").classList.remove("active");
 });
-document.getElementById("scaleMinor").addEventListener("click", e=>{
-  scaleType="minor"; e.target.classList.add("active");
-  document.getElementById("scaleMajor").classList.remove("active");
+document.getElementById("scaleMinor").addEventListener("click", e => {
+  scaleType = "minor"; e.target.classList.add("active"); document.getElementById("scaleMajor").classList.remove("active");
 });
-document.getElementById("modeDiatonic").addEventListener("click", e=>{
-  mode="diatonic"; e.target.classList.add("active");
-  document.getElementById("modeMajor").classList.remove("active");
+document.getElementById("modeDiatonic").addEventListener("click", e => {
+  mode = "diatonic"; e.target.classList.add("active"); document.getElementById("modeMajor").classList.remove("active");
 });
-document.getElementById("modeMajor").addEventListener("click", e=>{
-  mode="major"; e.target.classList.add("active");
-  document.getElementById("modeDiatonic").classList.remove("active");
+document.getElementById("modeMajor").addEventListener("click", e => {
+  mode = "major"; e.target.classList.add("active"); document.getElementById("modeDiatonic").classList.remove("active");
 });
 </script>
 </body>
