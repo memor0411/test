@@ -1,225 +1,214 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="utf-8" />
-<title>가상 피아노 (Web Audio API)</title>
+<meta charset="UTF-8">
+<title>가상 피아노</title>
 <style>
   body {
     background: #222;
-    color: #fff;
-    font-family: sans-serif;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     height: 100vh;
-    margin: 0;
+    color: white;
+    font-family: sans-serif;
   }
-  #startButton { padding:10px 20px; background:#4caf50; border:none; border-radius:8px; color:white; font-size:16px; cursor:pointer; }
-  .controls { display:none; gap:10px; margin:12px 0; }
-  select, button { padding:6px 10px; border-radius:6px; border:none; cursor:pointer; }
-  button.active { background:#4caf50; color:white; }
-  .piano { display:none; position:relative; height:250px; }
-  .white-key { width:60px; height:250px; background:white; border:1px solid black; box-shadow:inset -2px 0 3px rgba(0,0,0,0.25); display:inline-block; position:relative; cursor:pointer; }
-  .black-key { position:absolute; width:40px; height:160px; background:black; z-index:2; border-radius:0 0 4px 4px; cursor:pointer; }
-  .note-label { position:absolute; left:50%; bottom:8px; transform:translateX(-50%); font-size:12px; color:#333; }
-  .highlight-root { box-shadow:0 0 15px 5px rgba(255, 220, 50, 0.9); }
-  .highlight-chord { box-shadow:0 0 10px 4px rgba(100, 200, 255, 0.8); }
+
+  .controls {
+    margin-bottom: 20px;
+  }
+
+  button {
+    margin: 4px;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    background: #555;
+    color: white;
+  }
+
+  button.active {
+    background: #2ecc71;
+  }
+
+  .piano {
+    position: relative;
+    display: flex;
+  }
+
+  .white {
+    width: 60px;
+    height: 240px;
+    background: white;
+    border: 1px solid #000;
+    z-index: 1;
+    box-shadow: inset -2px 0 3px rgba(0,0,0,0.3);
+  }
+
+  .black {
+    width: 40px;
+    height: 150px;
+    background: black;
+    position: absolute;
+    top: 0;
+    z-index: 2;
+    margin-left: -20px;
+    border: 1px solid #111;
+  }
+
+  .key:active, .key.playing {
+    background: #ddd;
+  }
+
+  .black.playing {
+    background: #333;
+  }
+
 </style>
 </head>
 <body>
-  <h1>🎹 가상 피아노 (실제 음원 작동 버전)</h1>
-  <button id="startButton">🎵 피아노 시작하기</button>
 
-  <div class="controls" id="controls">
-    <label>옥타브:
-      <select id="octaveSelect">
-        <option value="2">2 옥타브</option>
-        <option value="3">3 옥타브</option>
-      </select>
-    </label>
-    <label>조성:
-      <select id="keySelect">
-        <option>C</option><option>D</option><option>E</option><option>F</option><option>G</option><option>A</option><option>B</option>
-      </select>
-    </label>
-    <label>음계:
-      <button id="scaleMajor" class="active">장조</button>
-      <button id="scaleMinor">단조</button>
-    </label>
-    <label>코드:
-      <button id="modeDiatonic" class="active">다이아토닉</button>
-      <button id="modeMajor">메이저</button>
-    </label>
+  <div class="controls">
+    <button id="startAudio">피아노 시작하기</button>
+    <button id="majorBtn" class="active">장조</button>
+    <button id="minorBtn">단조</button>
+    <button id="code1Btn" class="active">코드 1</button>
+    <button id="code2Btn">코드 2</button>
   </div>
 
-  <div id="status">버퍼 준비 전 — "피아노 시작하기" 버튼을 눌러주세요.</div>
   <div class="piano" id="piano"></div>
 
 <script>
-const BASE_URL = "https://github.com/gleitz/midi-js-soundfonts/tree/gh-pages/FluidR3_GM/acoustic_grand_piano-mp3/";
-const allNotes = ["C","Db","D","E#","E","F","Gb","G","Ab","A","Bb","B"];
-const semitoneMap = {"C":0,"Db":1,"D":2,"Eb":3,"E":4,"F":5,"Gb":6,"G":7,"Ab":8,"A":9,"Bb":10,"B":11};
-
+const AudioContext = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
-let audioBuffers = {};
-let octaves = 2;
-let currentKey = "C";
-let scaleType = "major";
-let mode = "diatonic";
-let isReady = false;
+let isStarted = false;
+let scaleType = 'major';
+let codeType = 1;
 
-function logStatus(msg){ document.getElementById("status").textContent = msg; }
+const BASE_URL = "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/";
+const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const OCTAVES = [4,5];
 
-async function loadAudio(note, octave) {
-  const name = note.replace("b","b");
-  const url = `${BASE_URL}${name}${octave}.mp3`;
+const audioBuffers = {};
+
+function noteToFile(note) {
+  return note.replace('#', 's');
+}
+
+async function loadNote(note, octave) {
+  const key = note + octave;
+  if (audioBuffers[key]) return;
+  const url = `${BASE_URL}${noteToFile(note)}${octave}.mp3`;
   try {
     const res = await fetch(url);
     const arr = await res.arrayBuffer();
-    const buffer = await audioCtx.decodeAudioData(arr);
-    audioBuffers[`${note}${octave}`] = buffer;
-  } catch (e) {
-    console.warn("음원 로드 실패:", url, e);
+    const buf = await audioCtx.decodeAudioData(arr);
+    audioBuffers[key] = buf;
+    console.log("로드 성공:", key);
+  } catch (err) {
+    console.error("로드 실패:", key, url);
   }
 }
 
-async function preloadAll() {
-  logStatus("음원 로드 중...");
-  audioBuffers = {};
-  for (let o = 3; o < 3 + octaves; o++) {
-    for (const n of allNotes) {
-      await loadAudio(n, o);
+async function preload() {
+  const promises = [];
+  for (let o of OCTAVES) {
+    for (let n of NOTES) {
+      promises.push(loadNote(n, o));
     }
   }
-  isReady = true;
-  logStatus("음원 로드 완료 ✅");
+  await Promise.all(promises);
+  console.log("모든 음 로드 완료");
 }
 
-function playSound(note, octave) {
-  const key = `${note}${octave}`;
-  const buffer = audioBuffers[key];
-  if (!buffer) return;
-  const src = audioCtx.createBufferSource();
-  src.buffer = buffer;
-  src.connect(audioCtx.destination);
-  src.start();
-}
+function playChord(note) {
+  const idx = NOTES.indexOf(note);
+  if (idx < 0) return;
 
-function getMajorChord(root) {
-  const i = semitoneMap[root];
-  return [root, allNotes[(i+4)%12], allNotes[(i+7)%12]];
-}
+  // 코드 구조
+  const major = [0, 4, 7];
+  const minor = [0, 3, 7];
+  const pattern = scaleType === 'major' ? major : minor;
 
-function getScale(key, type) {
-  const major = [2,2,1,2,2,2,1];
-  const minor = [2,1,2,2,1,2,2];
-  const pat = type === "minor" ? minor : major;
-  let i = semitoneMap[key];
-  const arr = [key];
-  for (let p of pat) { i = (i+p)%12; arr.push(allNotes[i]); }
-  return arr.slice(0,7);
-}
-
-function getDiatonicChord(root, key, type){
-  const scale = getScale(key, type);
-  const idx = scale.indexOf(root);
-  if (idx === -1) return getMajorChord(root);
-  return [ root, scale[(idx+2)%scale.length], scale[(idx+4)%scale.length] ];
-}
-
-function highlightChord(chord, root) {
-  document.querySelectorAll(".white-key,.black-key").forEach(k=>{
-    k.classList.remove("highlight-root","highlight-chord");
+  pattern.forEach(interval => {
+    let noteIndex = (idx + interval) % NOTES.length;
+    let octaveShift = Math.floor((idx + interval) / NOTES.length);
+    let octave = 4 + octaveShift;
+    const noteName = NOTES[noteIndex];
+    const key = noteName + octave;
+    if (audioBuffers[key]) {
+      const src = audioCtx.createBufferSource();
+      src.buffer = audioBuffers[key];
+      src.connect(audioCtx.destination);
+      src.start();
+    } else {
+      console.warn("음원 없음:", key);
+    }
   });
-  chord.forEach(n=>{
-    document.querySelectorAll(`[data-note^="${n}"]`).forEach(k=>{
-      if (n === root) k.classList.add("highlight-root");
-      else k.classList.add("highlight-chord");
-    });
-  });
-  setTimeout(()=>document.querySelectorAll(".highlight-root,.highlight-chord")
-    .forEach(k=>k.classList.remove("highlight-root","highlight-chord")), 700);
 }
 
-function onKeyClick(el) {
-  const noteFull = el.dataset.note;
-  const note = noteFull.slice(0,-1);
-  const octaveNum = parseInt(noteFull.slice(-1));
-  let chord = mode === "major" ? getMajorChord(note) : getDiatonicChord(note, currentKey, scaleType);
-  const rootIdx = semitoneMap[note];
-  chord.forEach((n,i)=>{
-    let oct = octaveNum;
-    if (i !== 0 && semitoneMap[n] < rootIdx) oct += 1;
-    playSound(n, oct);
-  });
-  highlightChord(chord, note);
-  logStatus(`${noteFull} → ${chord.join(" - ")}`);
-}
-
-function createPianoDom() {
+function createPiano() {
   const piano = document.getElementById("piano");
-  piano.innerHTML = "";
-  const whiteNotes = ["C","D","E","F","G","A","B"];
-  const blackNotes = ["Db","Eb", null, "Gb","Ab","Bb", null];
-  for (let o = 3; o < 3 + octaves; o++) {
-    const group = document.createElement("div");
-    group.style.display = "inline-block";
-    group.style.position = "relative";
-    whiteNotes.forEach((wn,i)=>{
-      const w=document.createElement("div");
-      w.className="white-key";
-      w.dataset.note=`${wn}${o}`;
-      w.innerHTML=`<div class="note-label">${wn}${o}</div>`;
-      w.addEventListener("click",()=>onKeyClick(w));
-      group.appendChild(w);
+  let whiteIndex = 0;
+  NOTES.forEach((note, i) => {
+    const key = document.createElement("div");
+    key.classList.add("key");
+    const isBlack = note.includes("#");
+    key.classList.add(isBlack ? "black" : "white");
+    key.dataset.note = note;
+    key.dataset.octave = 4;
+    if (isBlack) {
+      key.style.left = `${whiteIndex * 60 + 45}px`;
+    } else {
+      key.style.left = `${whiteIndex * 60}px`;
+      whiteIndex++;
+    }
+    key.addEventListener('mousedown', () => {
+      key.classList.add("playing");
+      playChord(note);
     });
-    blackNotes.forEach((bn,i)=>{
-      if(!bn)return;
-      const b=document.createElement("div");
-      b.className="black-key";
-      b.dataset.note=`${bn}${o}`;
-      b.style.left=`${(i+1)*60 - 20}px`;
-      b.innerHTML=`<div class="note-label">${bn}${o}</div>`;
-      b.addEventListener("click",()=>onKeyClick(b));
-      group.appendChild(b);
-    });
-    piano.appendChild(group);
-  }
+    key.addEventListener('mouseup', () => key.classList.remove("playing"));
+    key.addEventListener('mouseleave', () => key.classList.remove("playing"));
+    piano.appendChild(key);
+  });
 }
 
-document.getElementById("startButton").addEventListener("click", async ()=>{
-  audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-  await audioCtx.resume();
-  document.getElementById("startButton").style.display="none";
-  document.getElementById("controls").style.display="flex";
-  document.getElementById("piano").style.display="block";
-  createPianoDom();
-  await preloadAll();
+document.getElementById("startAudio").addEventListener("click", async () => {
+  if (!isStarted) {
+    audioCtx = new AudioContext();
+    isStarted = true;
+    await preload();
+    alert("피아노가 준비되었습니다!");
+  }
 });
 
-document.getElementById("octaveSelect").addEventListener("change", e=>{
-  octaves = parseInt(e.target.value);
-  createPianoDom();
-  preloadAll();
+document.getElementById("majorBtn").addEventListener("click", () => {
+  scaleType = 'major';
+  document.getElementById("majorBtn").classList.add("active");
+  document.getElementById("minorBtn").classList.remove("active");
 });
-document.getElementById("keySelect").addEventListener("change", e=>currentKey=e.target.value);
-document.getElementById("scaleMajor").addEventListener("click", e=>{
-  scaleType="major"; e.target.classList.add("active");
-  document.getElementById("scaleMinor").classList.remove("active");
+
+document.getElementById("minorBtn").addEventListener("click", () => {
+  scaleType = 'minor';
+  document.getElementById("minorBtn").classList.add("active");
+  document.getElementById("majorBtn").classList.remove("active");
 });
-document.getElementById("scaleMinor").addEventListener("click", e=>{
-  scaleType="minor"; e.target.classList.add("active");
-  document.getElementById("scaleMajor").classList.remove("active");
+
+document.getElementById("code1Btn").addEventListener("click", () => {
+  codeType = 1;
+  document.getElementById("code1Btn").classList.add("active");
+  document.getElementById("code2Btn").classList.remove("active");
 });
-document.getElementById("modeDiatonic").addEventListener("click", e=>{
-  mode="diatonic"; e.target.classList.add("active");
-  document.getElementById("modeMajor").classList.remove("active");
+
+document.getElementById("code2Btn").addEventListener("click", () => {
+  codeType = 2;
+  document.getElementById("code2Btn").classList.add("active");
+  document.getElementById("code1Btn").classList.remove("active");
 });
-document.getElementById("modeMajor").addEventListener("click", e=>{
-  mode="major"; e.target.classList.add("active");
-  document.getElementById("modeDiatonic").classList.remove("active");
-});
+
+createPiano();
 </script>
 </body>
 </html>
