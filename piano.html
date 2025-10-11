@@ -14,65 +14,26 @@
     color: white;
     font-family: sans-serif;
   }
-
-  .controls {
-    margin-bottom: 20px;
-  }
-
+  .controls { margin-bottom: 20px; }
   button {
-    margin: 4px;
-    padding: 8px 12px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    background: #555;
-    color: white;
+    margin: 4px; padding: 8px 12px; border: none; border-radius: 6px;
+    cursor: pointer; background: #555; color: white;
   }
-
-  button.active {
-    background: #2ecc71;
-  }
-
-  .piano {
-    position: relative;
-    display: flex;
-  }
-
+  button.active { background: #2ecc71; }
+  .piano { position: relative; display: flex; }
   .white {
-    width: 60px;
-    height: 240px;
-    background: white;
-    border: 1px solid #000;
-    z-index: 1;
-    box-shadow: inset -2px 0 3px rgba(0,0,0,0.3);
+    width: 60px; height: 240px; background: white; border: 1px solid #000;
+    z-index: 1; box-shadow: inset -2px 0 3px rgba(0,0,0,0.3);
   }
-
   .black {
-    width: 40px;
-    height: 150px;
-    background: black;
-    position: absolute;
-    top: 0;
-    z-index: 2;
-    margin-left: -20px;
-    border: 1px solid #111;
+    width: 40px; height: 150px; background: black; position: absolute;
+    top: 0; z-index: 2; margin-left: -20px; border: 1px solid #111;
   }
-
-  .key:active, .key.playing {
-    background: #ddd;
-  }
-
-  .black.playing {
-    background: #333;
-  }
-
+  .key:active, .key.playing { background: #ddd; }
+  .black.playing { background: #333; }
   .note-label {
-    position: absolute;
-    left: 50%;
-    bottom: 6px;
-    transform: translateX(-50%);
-    font-size: 12px;
-    color: #333;
+    position: absolute; left: 50%; bottom: 6px;
+    transform: translateX(-50%); font-size: 12px; color: #333;
   }
 </style>
 </head>
@@ -80,10 +41,6 @@
 
   <div class="controls">
     <button id="startAudio">피아노 시작하기</button>
-    <button id="majorBtn" class="active">메이저 코드</button>
-    <button id="minorBtn">마이너 코드</button>
-    <button id="code1Btn" class="active">코드 1</button>
-    <button id="code2Btn">코드 2</button>
   </div>
 
   <div class="piano" id="piano"></div>
@@ -93,20 +50,11 @@ const AudioContext = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
 let isStarted = false;
 
-/* --------------- 변경된 부분(시작) -----------------
-   chordMode: 'major' 또는 'minor' — 사용자가 선택한 코드 유형
-   아래 getTriad(...) 와 playChord(...) 함수가 새 알고리즘을 담당합니다.
-   다른 코드(로딩, UI, 배치 등)는 원본 그대로 유지했습니다.
---------------------------------------------------*/
-let chordMode = 'major'; // 기본: 메이저 코드
-
 const BASE_URL = "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/";
 const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const OCTAVES = [4,5];
-
 const audioBuffers = {};
 
-// helper: sharp->s filename like Cs -> Cs4.mp3 in that repo
 function noteToFile(note) {
   return note.replace('#', 's');
 }
@@ -129,56 +77,37 @@ async function loadNote(note, octave) {
 async function preload() {
   const promises = [];
   for (let o of OCTAVES) {
-    for (let n of NOTES) {
-      promises.push(loadNote(n, o));
-    }
+    for (let n of NOTES) promises.push(loadNote(n, o));
   }
+  // 다음 옥타브의 C도 로드 (C6)
+  promises.push(loadNote('C', 6));
   await Promise.all(promises);
   console.log("모든 음 로드 완료");
 }
 
-/* 새 알고리즘: 루트 기반의 트라이어드 계산 (메이저 또는 마이너)
-   - 루트 index = semitone index in NOTES
-   - 메이저: root, root+4, root+7
-   - 마이너: root, root+3, root+7
-   반환값: [noteName1, noteName2, noteName3] (예: ["F#", "A#", "C#"])
-*/
-function getTriad(root, mode) {
-  const semitoneMap = {};
-  for (let i = 0; i < NOTES.length; i++) semitoneMap[NOTES[i]] = i;
+/* 완전 새로 짠 코드 계산 로직 */
+function getChordNotes(rootNote, rootOctave) {
+  const idx = NOTES.indexOf(rootNote);
+  if (idx < 0) return [{note: rootNote, octave: rootOctave}];
 
-  const rootIdx = semitoneMap[root];
-  if (rootIdx === undefined) return [root];
+  const intervals = [0, 4, 7]; // root, major 3rd, perfect 5th
+  const result = [];
 
-  const thirdInterval = (mode === 'major') ? 4 : 3;
-  const thirdIdx = (rootIdx + thirdInterval) % 12;
-  const fifthIdx = (rootIdx + 7) % 12;
+  for (let intv of intervals) {
+    const noteIdx = (idx + intv) % 12;
+    const octaveShift = Math.floor((idx + intv) / 12);
+    const note = NOTES[noteIdx];
+    const octave = rootOctave + octaveShift;
+    result.push({note, octave});
+  }
 
-  const third = NOTES[thirdIdx];
-  const fifth = NOTES[fifthIdx];
-
-  return [root, third, fifth];
+  return result;
 }
 
-/* playChord 변경:
-   - getTriad(...)으로 코드음 계산
-   - 각 음에 대해 옥타브 처리: 기준 옥타브는 4
-     (만약 음의 semitone index < root semitone index -> 그 음은 다음 옥타브로 올림)
-   - AudioBuffer가 준비되어 있으면 AudioBufferSource로 동시에 재생
-*/
-function playChord(rootNote) {
-  const semitoneMap = {};
-  for (let i = 0; i < NOTES.length; i++) semitoneMap[NOTES[i]] = i;
-
-  const triad = getTriad(rootNote, chordMode); // e.g. ["F#", "A#", "C#"]
-  const rootIdx = semitoneMap[rootNote];
-
-  triad.forEach((n, i) => {
-    let noteIdx = semitoneMap[n];
-    let octave = 4;
-    // 만약 화음 음의 인덱스이 루트보다 작으면 같은 옥타브가 아닌 다음 옥타브로 재생
-    if (i !== 0 && noteIdx < rootIdx) octave += 1;
-    const key = `${n}${octave}`;
+function playChord(rootNote, rootOctave) {
+  const chord = getChordNotes(rootNote, rootOctave);
+  chord.forEach(n => {
+    const key = n.note + n.octave;
     const buffer = audioBuffers[key];
     if (buffer) {
       const src = audioCtx.createBufferSource();
@@ -186,85 +115,67 @@ function playChord(rootNote) {
       src.connect(audioCtx.destination);
       src.start();
     } else {
-      console.warn('음원 없음:', key);
+      console.warn("음원 없음:", key);
     }
   });
 }
-/* --------------- 변경된 부분(끝) ----------------- */
-
-
-// 이하 원본 코드(버튼, 피아노 생성 등) — 수정 금지 요청대로 유지
 
 function createPiano() {
   const piano = document.getElementById("piano");
   piano.innerHTML = "";
-
-  // white notes per octave
   const whiteNotes = ['C','D','E','F','G','A','B'];
-  const blackPattern = ['C#','D#', null, 'F#','G#','A#', null];
+  const blackPattern = ['C#','D#',null,'F#','G#','A#',null];
 
-  // build list of white keys: two octaves (4,5) plus top C (6)
   const whiteKeys = [];
   for (let o = 4; o <= 5; o++) {
-    for (const wn of whiteNotes) {
-      whiteKeys.push({ note: wn, octave: o });
-    }
+    for (const wn of whiteNotes) whiteKeys.push({note: wn, octave: o});
   }
-  // add final top C (to end on '도')
-  whiteKeys.push({ note: 'C', octave: 6 });
+  whiteKeys.push({note: 'C', octave: 6});
 
-  // set container to absolute-layout mode so left offsets work
-  const totalWhite = whiteKeys.length;
   piano.style.display = 'block';
-  piano.style.width = (totalWhite * 60) + 'px';
+  piano.style.width = (whiteKeys.length * 60) + 'px';
   piano.style.height = '240px';
   piano.style.position = 'relative';
 
-  // create white keys (absolute positioned)
+  // white
   whiteKeys.forEach((k, i) => {
     const w = document.createElement('div');
     w.classList.add('key', 'white');
     w.style.position = 'absolute';
     w.style.left = (i * 60) + 'px';
-    w.style.top = '0';
     w.dataset.note = k.note;
     w.dataset.octave = k.octave;
     w.innerHTML = `<div class="note-label">${k.note}${k.octave}</div>`;
-
     w.addEventListener('mousedown', () => {
       w.classList.add('playing');
-      playChord(k.note);
+      playChord(k.note, k.octave);
     });
     w.addEventListener('mouseup', () => w.classList.remove('playing'));
     w.addEventListener('mouseleave', () => w.classList.remove('playing'));
-
     piano.appendChild(w);
   });
 
-  // create black keys for each octave (absolute positioned between whites)
+  // black
   for (let oIndex = 0; oIndex < 2; oIndex++) {
     const baseOctave = 4 + oIndex;
     for (let i = 0; i < blackPattern.length; i++) {
       const bn = blackPattern[i];
       if (!bn) continue;
-      const whiteIndex = oIndex * 7 + i; // position after this white key
-      const left = (whiteIndex * 60) + 45; // offset to place black key over gap
+      const whiteIndex = oIndex * 7 + i;
+      const left = (whiteIndex * 60) + 45;
       const b = document.createElement('div');
       b.classList.add('key', 'black');
       b.style.position = 'absolute';
       b.style.left = left + 'px';
-      b.style.top = '0px';
       b.dataset.note = bn;
       b.dataset.octave = baseOctave;
       b.innerHTML = `<div class="note-label">${bn}${baseOctave}</div>`;
-
       b.addEventListener('mousedown', () => {
         b.classList.add('playing');
-        playChord(bn);
+        playChord(bn, baseOctave);
       });
       b.addEventListener('mouseup', () => b.classList.remove('playing'));
       b.addEventListener('mouseleave', () => b.classList.remove('playing'));
-
       piano.appendChild(b);
     }
   }
@@ -277,28 +188,6 @@ document.getElementById("startAudio").addEventListener("click", async () => {
     await preload();
     alert("피아노가 준비되었습니다!");
   }
-});
-
-// 변경: 메이저/마이너 버튼 — chordMode 변수만 변경 (다른 로직 건드리지 않음)
-document.getElementById("majorBtn").addEventListener("click", () => {
-  chordMode = 'major';
-  document.getElementById("majorBtn").classList.add("active");
-  document.getElementById("minorBtn").classList.remove("active");
-});
-document.getElementById("minorBtn").addEventListener("click", () => {
-  chordMode = 'minor';
-  document.getElementById("minorBtn").classList.add("active");
-  document.getElementById("majorBtn").classList.remove("active");
-});
-
-// 기존 버튼들(기능 유지)
-document.getElementById("code1Btn").addEventListener("click", () => {
-  document.getElementById("code1Btn").classList.add("active");
-  document.getElementById("code2Btn").classList.remove("active");
-});
-document.getElementById("code2Btn").addEventListener("click", () => {
-  document.getElementById("code2Btn").classList.add("active");
-  document.getElementById("code1Btn").classList.remove("active");
 });
 
 createPiano();
