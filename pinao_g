@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<title>가상 피아노 — 장조 + 코드(동시 3음)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<style>
+  :root{--white-w:60px;--white-h:240px;--black-w:40px;--black-h:150px}
+  body{background:#111;color:#fff;font-family:system-ui,Segoe UI,Roboto,Arial;display:flex;flex-direction:column;align-items:center;padding:18px}
+  h1{margin:6px 0 12px;font-size:20px}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  select,button{padding:8px 10px;border-radius:6px;border:0;background:#333;color:#fff;cursor:pointer}
+  button.primary{background:#2ecc71}
+  .status{margin-top:8px;color:#ffd;}
+  #wrap{border-radius:8px;padding:12px;background:linear-gradient(180deg,#222,#1a1a1a);box-shadow:0 6px 24px rgba(0,0,0,.6)}
+  #piano{position:relative;height:var(--white-h);margin-top:12px;user-select:none}
+  .white-key{width:var(--white-w);height:var(--white-h);background:#fff;border:1px solid #000;box-sizing:border-box;position:absolute;z-index:1;border-bottom-left-radius:6px;border-bottom-right-radius:6px}
+  .black-key{width:var(--black-w);height:var(--black-h);background:#000;position:absolute;z-index:2;border-radius:0 0 6px 6px;box-shadow:inset -2px 0 8px rgba(255,255,255,0.03)}
+  .label{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);font-size:12px;color:#333}
+  .playing-white{background:#eee}
+  .playing-black{background:#222}
+  .chordDisplay{margin-top:10px;height:20px;color:#bdf;font-size:14px}
+  @media (max-width:720px){:root{--white-w:44px;--white-h:180px;--black-w:30px;--black-h:120px}}
+</style>
+</head>
+<body>
+  <div id="wrap">
+    <h1>가상 피아노 — 장조 선택 & 코드(3화음) 재생</h1>
+
+    <div class="controls">
+      <button id="startBtn" class="primary">Start (오디오 허용)</button>
+
+      <label>
+        Major Key:
+        <select id="keySelect">
+          <!-- 표시용 문자열(플랫은 그대로) -->
+          <option>C</option><option>G</option><option>D</option><option>A</option><option>E</option>
+          <option>B</option><option>F#</option><option>C#</option>
+          <option>F</option><option>Bb</option><option>Eb</option><option>Ab</option>
+        </select>
+      </label>
+
+      <label>
+        Mode:
+        <select id="modeSelect">
+          <option value="diatonic">Diatonic (selected major scale)</option>
+          <option value="major">Force Major triad</option>
+          <option value="minor">Force Minor triad</option>
+        </select>
+      </label>
+
+      <label>
+        Octaves:
+        <select id="octaveSelect"><option value="2">2 옥타브 (default)</option><option value="3">3 옥타브</option></select>
+      </label>
+    </div>
+
+    <div id="piano"></div>
+    <div class="chordDisplay" id="chordDisplay">키를 선택하고 Start 버튼을 누른 뒤 건반을 누르세요.</div>
+    <div class="status" id="status"></div>
+  </div>
+
+<script>
+/* =========================
+   음악 이론 · 유틸
+   ========================= */
+const CHROMATIC = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; // 샤프로 통일
+const flat2sharp = { 'Bb':'A#','Eb':'D#','Ab':'G#','Db':'C#','Gb':'F#','Cb':'B','Fb':'E' };
+
+// MIDI 계산: C4 = 60 (MIDI standard)
+function midiNumber(noteName, octave){
+  const n = noteName.replace('♯','#').replace('♭',''); // just in case
+  const idx = CHROMATIC.indexOf(n);
+  if (idx === -1) throw new Error('Unknown note: ' + noteName);
+  return idx + 12 * (octave + 1); // since (octave+1)*12 + idx yields C4->60
+}
+function midiToFreq(midi){
+  return 440 * Math.pow(2,(midi - 69)/12);
+}
+
+// normalize tonic: convert flats to sharps where needed (user may select 'Bb' etc)
+function normalizeKeyName(k){
+  if (flat2sharp[k]) return flat2sharp[k];
+  // also accept 'F#' 'C#' etc as-is
+  return k;
+}
+
+// build major scale note names (length 7) for given tonic (sharp notation)
+// pattern for major: 2 2 1 2 2 2 1 (semitones)
+function buildMajorScale(tonic){
+  tonic = normalizeKeyName(tonic);
+  const startIdx = CHROMATIC.indexOf(tonic);
+  const steps = [2,2,1,2,2,2,1];
+  const notes = [CHROMATIC[startIdx]];
+  let idx = startIdx;
+  for (let s of steps){
+    idx = (idx + s) % 12;
+    notes.push(CHROMATIC[idx]);
+  }
+  return notes.slice(0,7);
+}
+
+/* get chord notes (array of {note, octave, midi}) given:
+   - pressed root note name (e.g. 'C#') and octave number (e.g. 4)
+   - mode: 'diatonic' | 'major' | 'minor'
+   - currentKey: selected major key (tonic)
+*/
+function getChordForPressed(rootName, rootOctave, mode, currentKey){
+  rootName = normalizeKeyName(rootName);
+  // root midi
+  const rootMidi = midiNumber(rootName, rootOctave);
+
+  if (mode === 'major' || mode === 'minor'){
+    const intervals = mode === 'major' ? [0,4,7] : [0,3,7];
+    return intervals.map(i => {
+      const m = rootMidi + i;
+      const noteIdx = m % 12;
+      const oct = Math.floor(m/12) - 1;
+      return { note: CHROMATIC[noteIdx], octave: oct, midi: m };
+    });
+  }
+
+  // mode === 'diatonic'
+  // build major scale intervals relative to tonic
+  const tonic = normalizeKeyName(currentKey);
+  const scale = buildMajorScale(tonic); // note names
+  // find degree of pressed root within scale
+  const rootDegree = scale.indexOf(rootName);
+  if (rootDegree === -1){
+    // pressed note not in scale -> fallback to major triad of pressed note
+    const intervals = [0,4,7];
+    return intervals.map(i => {
+      const m = rootMidi + i;
+      const noteIdx = m % 12;
+      const oct = Math.floor(m/12) - 1;
+      return { note: CHROMATIC[noteIdx], octave: oct, midi: m };
+    });
+  }
+  // cumulative semitone offsets from tonic for major scale: 0,2,4,5,7,9,11
+  const cum = [0,2,4,5,7,9,11];
+  // delta from pressed root degree to target degrees
+  const thirdDegree = (rootDegree + 2) % 7;
+  const fifthDegree = (rootDegree + 4) % 7;
+  let deltaThird = cum[thirdDegree] - cum[rootDegree];
+  let deltaFifth = cum[fifthDegree] - cum[rootDegree];
+  // if negative, shift up an octave
+  if (deltaThird < 0) deltaThird += 12;
+  if (deltaFifth < 0) deltaFifth += 12;
+  // build chord midi numbers
+  const thirdMidi = rootMidi + deltaThird;
+  const fifthMidi = rootMidi + deltaFifth;
+  return [
+    { note: rootName, octave: rootOctave, midi: rootMidi },
+    toNoteObj(thirdMidi),
+    toNoteObj(fifthMidi)
+  ];
+}
+
+function toNoteObj(midi){
+  const noteIdx = midi % 12;
+  const oct = Math.floor(midi/12) - 1;
+  return { note: CHROMATIC[noteIdx], octave: oct, midi };
+}
+
+/* =========================
+   WebAudio (synth) 부분
+   - simple dual-oscillator with ADSR envelope
+   - play multiple notes simultaneously
+   ========================= */
+let audioCtx = null;
+function ensureAudioContext(){
+  if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+}
+
+function playNoteMidi(midi, when=0){
+  ensureAudioContext();
+  const freq = midiToFreq(midi);
+  // create nodes
+  const osc1 = audioCtx.createOscillator();
+  const osc2 = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  // timbre
+  osc1.type = 'sine';
+  osc2.type = 'sawtooth';
+  osc1.frequency.value = freq;
+  osc2.frequency.value = freq * 2; // octave/harmonic layer to enrich
+  // envelope
+  const now = audioCtx.currentTime + when;
+  gain.gain.setValueAtTime(0, now);
+  const attack = 0.006;
+  const decay = 0.18;
+  const sustain = 0.5;
+  const release = 0.9;
+  gain.gain.linearRampToValueAtTime(1.0, now + attack);
+  gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, sustain), now + attack + decay);
+  // connect
+  osc1.connect(gain);
+  osc2.connect(gain);
+  gain.connect(audioCtx.destination);
+  // start/stop
+  osc1.start(now);
+  osc2.start(now);
+  const stopAt = now + attack + decay + 0.6; // hold a little
+  gain.gain.exponentialRampToValueAtTime(0.0001, stopAt + release);
+  osc1.stop(stopAt + release + 0.05);
+  osc2.stop(stopAt + release + 0.05);
+}
+
+/* play triad (array of note objects with midi fields) */
+function playTriad(noteObjs){
+  // start them at the same audio time
+  const t = 0;
+  for (const n of noteObjs){
+    playNoteMidi(n.midi, t);
+  }
+}
+
+/* =========================
+   Piano DOM 생성 및 이벤트
+   - two octaves default (C4..B5) plus top C (C6)
+   - black keys placed between whites
+   ========================= */
+const pianoEl = document.getElementById('piano');
+const chordDisplay = document.getElementById('chordDisplay');
+const statusEl = document.getElementById('status');
+
+function createPianoDOM(octaveCount = 2){
+  pianoEl.innerHTML = '';
+  // white notes per octave
+  const whiteOrder = ['C','D','E','F','G','A','B'];
+  const blackPattern = ['C#','D#',null,'F#','G#','A#',null];
+  // build white key list across octaves, then append top C
+  const whiteKeys = [];
+  for (let o = 4; o < 4 + octaveCount; o++){
+    for (const wn of whiteOrder) whiteKeys.push({note:wn,octave:o});
+  }
+  // top C
+  whiteKeys.push({note:'C',octave:4+octaveCount});
+  // set piano width & position
+  const W = whiteKeys.length * parseInt(getComputedStyle(document.documentElement).getPropertyValue('--white-w')) || 60;
+  pianoEl.style.width = (whiteKeys.length * 60) + 'px';
+  pianoEl.style.height = 'var(--white-h)';
+  pianoEl.style.position = 'relative';
+  // create white keys absolute
+  whiteKeys.forEach((k,i) => {
+    const d = document.createElement('div');
+    d.className = 'white-key';
+    d.style.left = (i * 60) + 'px';
+    d.dataset.note = k.note;
+    d.dataset.octave = k.octave;
+    d.innerHTML = `<div class="label">${k.note}${k.octave}</div>`;
+    d.addEventListener('mousedown', async (e) => {
+      const mode = document.getElementById('modeSelect').value;
+      const key = document.getElementById('keySelect').value;
+      const chord = getChordForPressed(k.note, k.octave, mode, key);
+      highlightKeys(chord);
+      playTriad(chord);
+      showChord(chord);
+    });
+    d.addEventListener('mouseup', () => removePlayingClasses());
+    d.addEventListener('mouseleave', () => removePlayingClasses());
+    pianoEl.appendChild(d);
+  });
+  // create black keys
+  for (let oIndex = 0; oIndex < octaveCount; oIndex++){
+    const baseOct = 4 + oIndex;
+    for (let i=0;i<blackPattern.length;i++){
+      const bn = blackPattern[i];
+      if (!bn) continue;
+      const whiteIndex = oIndex*7 + i;
+      const left = (whiteIndex * 60) + 45;
+      const b = document.createElement('div');
+      b.className = 'black-key';
+      b.style.left = left + 'px';
+      b.dataset.note = bn;
+      b.dataset.octave = baseOct;
+      b.innerHTML = `<div class="label">${bn}${baseOct}</div>`;
+      b.addEventListener('mousedown', async (e) => {
+        const mode = document.getElementById('modeSelect').value;
+        const key = document.getElementById('keySelect').value;
+        const chord = getChordForPressed(bn, baseOct, mode, key);
+        highlightKeys(chord);
+        playTriad(chord);
+        showChord(chord);
+      });
+      b.addEventListener('mouseup', () => removePlayingClasses());
+      b.addEventListener('mouseleave', () => removePlayingClasses());
+      pianoEl.appendChild(b);
+    }
+  }
+}
+
+function highlightKeys(noteObjs){
+  removePlayingClasses();
+  for (const n of noteObjs){
+    // find elements that match note name & octave
+    const sel = `[data-note="${n.note}"][data-octave="${n.octave}"]`;
+    const el = pianoEl.querySelector(sel);
+    if (el){
+      if (el.classList.contains('white-key')) el.classList.add('playing-white');
+      else el.classList.add('playing-black');
+    }
+  }
+}
+function removePlayingClasses(){
+  pianoEl.querySelectorAll('.playing-white').forEach(e=>e.classList.remove('playing-white'));
+  pianoEl.querySelectorAll('.playing-black').forEach(e=>e.classList.remove('playing-black'));
+}
+function showChord(noteObjs){
+  const txt = noteObjs.map(n=>`${n.note}${n.octave}`).join(' - ');
+  chordDisplay.textContent = `재생: ${txt}`;
+}
+
+/* =========================
+   UI logic
+   ========================= */
+document.getElementById('startBtn').addEventListener('click', async ()=>{
+  ensureAudioContext();
+  // some browsers require resume on gesture
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+  statusEl.textContent = '오디오 준비됨 — 건반을 눌러보세요.';
+});
+
+document.getElementById('octaveSelect').addEventListener('change', (e)=>{
+  const count = parseInt(e.target.value,10);
+  createPianoDOM(count);
+});
+
+/* init */
+createPianoDOM(2); // 기본 2옥타브
+</script>
+</body>
+</html>
