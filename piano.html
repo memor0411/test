@@ -35,7 +35,7 @@
 
   .piano {
     position: relative;
-    display: flex;
+    /* display:flex; 기존 CSS는 그대로 유지되지만 아래 JS에서 inline style으로 재정의하여 정상 배치합니다 */
   }
 
   .white {
@@ -58,14 +58,17 @@
     border: 1px solid #111;
   }
 
-  .key:active, .key.playing {
-    background: #ddd;
-  }
+  .key.playing { background: #ddd; }
+  .black.playing { background:#333; }
 
-  .black.playing {
-    background: #333;
+  .note-label {
+    position: absolute;
+    left: 50%;
+    bottom: 6px;
+    transform: translateX(-50%);
+    font-size: 12px;
+    color: #333;
   }
-
 </style>
 </head>
 <body>
@@ -149,31 +152,90 @@ function playChord(note) {
   });
 }
 
+/* ---------------------------
+   변경된 부분: createPiano
+   - 도(C)에서 시작해서 도(C)로 끝나도록 (두 옥타브 + 상위 C 포함)
+   - 화이트키 15개 (C4..B5 + C6), 블랙키는 각 옥타브 내부에 올바른 위치에 절대 배치
+   - 다른 기존 코드(재생/로딩/버튼)는 건드리지 않음
+   --------------------------- */
 function createPiano() {
   const piano = document.getElementById("piano");
-  let whiteIndex = 0;
-  NOTES.forEach((note, i) => {
-    const key = document.createElement("div");
-    key.classList.add("key");
-    const isBlack = note.includes("#");
-    key.classList.add(isBlack ? "black" : "white");
-    key.dataset.note = note;
-    key.dataset.octave = 4;
-    if (isBlack) {
-      key.style.left = `${whiteIndex * 60 + 45}px`;
-    } else {
-      key.style.left = `${whiteIndex * 60}px`;
-      whiteIndex++;
+  piano.innerHTML = "";
+
+  // white notes per octave
+  const whiteNotes = ['C','D','E','F','G','A','B'];
+  const blackPattern = ['C#','D#', null, 'F#','G#','A#', null];
+
+  // build list of white keys: two octaves (4,5) plus top C (6)
+  const whiteKeys = [];
+  for (let o = 4; o <= 5; o++) {
+    for (const wn of whiteNotes) {
+      whiteKeys.push({ note: wn, octave: o });
     }
-    key.addEventListener('mousedown', () => {
-      key.classList.add("playing");
-      playChord(note);
+  }
+  // add final top C (to end on '도')
+  whiteKeys.push({ note: 'C', octave: 6 });
+
+  // set container to absolute-layout mode so left offsets work
+  const totalWhite = whiteKeys.length;
+  piano.style.display = 'block'; // override CSS flex to allow absolute layout
+  piano.style.width = (totalWhite * 60) + 'px';
+  piano.style.height = '240px';
+  piano.style.position = 'relative';
+
+  // create white keys (absolute positioned)
+  whiteKeys.forEach((k, i) => {
+    const w = document.createElement('div');
+    w.classList.add('key', 'white');
+    w.style.position = 'absolute';
+    w.style.left = (i * 60) + 'px';
+    w.style.top = '0';
+    w.dataset.note = k.note;       // playChord expects the note name (no octave)
+    w.dataset.octave = k.octave;   // left for reference / possible future use
+    w.innerHTML = `<div class="note-label">${k.note}${k.octave}</div>`;
+
+    w.addEventListener('mousedown', () => {
+      w.classList.add('playing');
+      playChord(k.note);
     });
-    key.addEventListener('mouseup', () => key.classList.remove("playing"));
-    key.addEventListener('mouseleave', () => key.classList.remove("playing"));
-    piano.appendChild(key);
+    w.addEventListener('mouseup', () => w.classList.remove('playing'));
+    w.addEventListener('mouseleave', () => w.classList.remove('playing'));
+
+    piano.appendChild(w);
   });
+
+  // create black keys for each octave (absolute positioned between whites)
+  // for octave 4 and 5
+  for (let oIndex = 0; oIndex < 2; oIndex++) {
+    const baseOctave = 4 + oIndex;
+    for (let i = 0; i < blackPattern.length; i++) {
+      const bn = blackPattern[i];
+      if (!bn) continue;
+      const whiteIndex = oIndex * 7 + i; // position after this white key
+      const left = (whiteIndex * 60) + 45; // offset to place black key over gap
+      const b = document.createElement('div');
+      b.classList.add('key', 'black');
+      b.style.position = 'absolute';
+      b.style.left = left + 'px';
+      b.style.top = '0px';
+      b.dataset.note = bn;
+      b.dataset.octave = baseOctave;
+      b.innerHTML = `<div class="note-label">${bn}${baseOctave}</div>`;
+
+      b.addEventListener('mousedown', () => {
+        b.classList.add('playing');
+        playChord(bn);
+      });
+      b.addEventListener('mouseup', () => b.classList.remove('playing'));
+      b.addEventListener('mouseleave', () => b.classList.remove('playing'));
+
+      piano.appendChild(b);
+    }
+  }
 }
+/* ---------------------------
+   end createPiano
+   --------------------------- */
 
 document.getElementById("startAudio").addEventListener("click", async () => {
   if (!isStarted) {
