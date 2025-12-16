@@ -1,196 +1,401 @@
 <!DOCTYPE html>
+
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<title>가상 피아노</title>
-<style>
-  body {
-    background: #222;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-    color: white;
-    font-family: sans-serif;
-  }
-  .controls { margin-bottom: 20px; }
-  button {
-    margin: 4px; padding: 8px 12px; border: none; border-radius: 6px;
-    cursor: pointer; background: #555; color: white;
-  }
-  button.active { background: #2ecc71; }
-  .piano { position: relative; display: flex; }
-  .white {
-    width: 60px; height: 240px; background: white; border: 1px solid #000;
-    z-index: 1; box-shadow: inset -2px 0 3px rgba(0,0,0,0.3);
-  }
-  .black {
-    width: 40px; height: 150px; background: black; position: absolute;
-    top: 0; z-index: 2; margin-left: -20px; border: 1px solid #111;
-  }
-  .key:active, .key.playing { background: #ddd; }
-  .black.playing { background: #333; }
-  .note-label {
-    position: absolute; left: 50%; bottom: 6px;
-    transform: translateX(-50%); font-size: 12px; color: #333;
-  }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>가상 피아노 - 화음 선택</title>
+  <style>
+    body {
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      font-family: 'Arial', sans-serif;
+      padding: 20px;
+    }
+
+```
+h1 {
+  color: white;
+  margin-bottom: 20px;
+  font-size: 2em;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.chord-selector {
+  background: rgba(255,255,255,0.15);
+  padding: 20px;
+  border-radius: 10px;
+  margin-bottom: 30px;
+  backdrop-filter: blur(10px);
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.chord-selector label {
+  color: white;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.chord-btn {
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: 2px solid rgba(255,255,255,0.3);
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s;
+  font-weight: bold;
+}
+
+.chord-btn:hover {
+  background: rgba(255,255,255,0.3);
+  transform: translateY(-2px);
+}
+
+.chord-btn.active {
+  background: #4CAF50;
+  border-color: #45a049;
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+}
+
+.piano-container {
+  background: #333;
+  padding: 20px 20px 30px 20px;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.piano {
+  display: flex;
+  position: relative;
+  height: 250px;
+}
+
+.key-container {
+  position: relative;
+  width: 60px;
+}
+
+.key {
+  width: 60px;
+  height: 250px;
+  border: 1px solid #000;
+  background: linear-gradient(to bottom, #fff 0%, #f5f5f5 100%);
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-shadow: inset -2px 0 3px rgba(0,0,0,0.2), 0 2px 5px rgba(0,0,0,0.3);
+  cursor: pointer;
+  transition: all 0.1s;
+  border-radius: 0 0 5px 5px;
+}
+
+.key:hover {
+  background: linear-gradient(to bottom, #f0f0f0 0%, #e5e5e5 100%);
+}
+
+.key.black {
+  width: 40px;
+  height: 160px;
+  background: linear-gradient(to bottom, #000 0%, #333 100%);
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  box-shadow: inset -2px 0 3px rgba(255,255,255,0.1), 0 5px 10px rgba(0,0,0,0.5);
+  border-radius: 0 0 3px 3px;
+}
+
+.key.black:hover {
+  background: linear-gradient(to bottom, #222 0%, #444 100%);
+}
+
+.key:active, .key.playing {
+  transform: translateY(2px);
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);
+}
+
+.key.black:active, .key.black.playing {
+  transform: translateX(-50%) translateY(2px);
+  background: linear-gradient(to bottom, #444 0%, #555 100%);
+}
+
+.note-label {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: #666;
+  font-weight: bold;
+}
+
+.key.black .note-label {
+  color: #ccc;
+  bottom: 5px;
+  font-size: 10px;
+}
+
+.chord-display {
+  background: rgba(255,255,255,0.1);
+  padding: 15px 30px;
+  border-radius: 10px;
+  margin-top: 20px;
+  color: white;
+  font-size: 18px;
+  min-height: 30px;
+  backdrop-filter: blur(10px);
+  text-align: center;
+}
+
+.instructions {
+  color: white;
+  margin-top: 20px;
+  text-align: center;
+  font-size: 14px;
+  opacity: 0.8;
+  max-width: 600px;
+  line-height: 1.6;
+}
+```
+
+  </style>
 </head>
 <body>
 
-  <div class="controls">
-    <button id="startAudio">피아노 시작하기</button>
+  <h1>🎹 가상 피아노 - 화음 선택</h1>
+
+  <div class="chord-selector">
+    <label>화음 선택:</label>
+    <button class="chord-btn active" data-chord="tonic">으뜸화음 (I)</button>
+    <button class="chord-btn" data-chord="subdominant">버금딸림화음 (IV)</button>
+    <button class="chord-btn" data-chord="dominant">딸림화음 (V)</button>
   </div>
 
-  <div class="piano" id="piano"></div>
+  <div class="piano-container">
+    <div class="piano">
+      <!-- C -->
+      <div class="key-container">
+        <div class="key" data-note="C">
+          <span class="note-label">C</span>
+        </div>
+        <div class="key black" data-note="C#">
+          <span class="note-label">C#</span>
+        </div>
+      </div>
 
-<script>
-const AudioContext = window.AudioContext || window.webkitAudioContext;
-let audioCtx;
-let isStarted = false;
+```
+  <!-- D -->
+  <div class="key-container">
+    <div class="key" data-note="D">
+      <span class="note-label">D</span>
+    </div>
+    <div class="key black" data-note="D#">
+      <span class="note-label">D#</span>
+    </div>
+  </div>
+  
+  <!-- E -->
+  <div class="key-container">
+    <div class="key" data-note="E">
+      <span class="note-label">E</span>
+    </div>
+  </div>
+  
+  <!-- F -->
+  <div class="key-container">
+    <div class="key" data-note="F">
+      <span class="note-label">F</span>
+    </div>
+    <div class="key black" data-note="F#">
+      <span class="note-label">F#</span>
+    </div>
+  </div>
+  
+  <!-- G -->
+  <div class="key-container">
+    <div class="key" data-note="G">
+      <span class="note-label">G</span>
+    </div>
+    <div class="key black" data-note="G#">
+      <span class="note-label">G#</span>
+    </div>
+  </div>
+  
+  <!-- A -->
+  <div class="key-container">
+    <div class="key" data-note="A">
+      <span class="note-label">A</span>
+    </div>
+    <div class="key black" data-note="A#">
+      <span class="note-label">A#</span>
+    </div>
+  </div>
+  
+  <!-- B -->
+  <div class="key-container">
+    <div class="key" data-note="B">
+      <span class="note-label">B</span>
+    </div>
+  </div>
+</div>
+```
 
-const BASE_URL = "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/";
-const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-const OCTAVES = [4,5];
-const audioBuffers = {};
+  </div>
 
-function noteToFile(note) {
-  return note.replace('#', 's');
-}
+  <div class="chord-display" id="chordDisplay">화음을 선택하고 건반을 클릭하세요</div>
 
-async function loadNote(note, octave) {
-  const key = note + octave;
-  if (audioBuffers[key]) return;
-  const url = `${BASE_URL}${noteToFile(note)}${octave}.mp3`;
-  try {
-    const res = await fetch(url);
-    const arr = await res.arrayBuffer();
-    const buf = await audioCtx.decodeAudioData(arr);
-    audioBuffers[key] = buf;
-    console.log("로드 성공:", key);
-  } catch (err) {
-    console.error("로드 실패:", key, url);
-  }
-}
+  <div class="instructions">
+    <strong>으뜸화음 (I)</strong>: 해당 음을 으뜸음으로 하는 3화음 (1도-3도-5도)<br>
+    <strong>버금딸림화음 (IV)</strong>: 해당 음을 딸림음으로 하는 3화음 (4도-6도-1도)<br>
+    <strong>딸림화음 (V)</strong>: 해당 음을 이끔음으로 하는 3화음 (5도-7도-2도)
+  </div>
 
-async function preload() {
-  const promises = [];
-  for (let o of OCTAVES) {
-    for (let n of NOTES) promises.push(loadNote(n, o));
-  }
-  // 다음 옥타브의 C도 로드 (C6)
-  promises.push(loadNote('C', 6));
-  await Promise.all(promises);
-  console.log("모든 음 로드 완료");
-}
+  <script>
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const chordDisplay = document.getElementById('chordDisplay');
+    let selectedChordType = 'tonic';
 
-/* 완전 새로 짠 코드 계산 로직 */
-function getChordNotes(rootNote, rootOctave) {
-  const idx = NOTES.indexOf(rootNote);
-  if (idx < 0) return [{note: rootNote, octave: rootOctave}];
+    // 음 주파수 정의
+    const frequencies = {
+      'C': 261.63, 'C#': 277.18, 'D': 293.66, 'D#': 311.13,
+      'E': 329.63, 'F': 349.23, 'F#': 369.99, 'G': 392.00,
+      'G#': 415.30, 'A': 440.00, 'A#': 466.16, 'B': 493.88,
+      'C2': 523.25, 'C#2': 554.37, 'D2': 587.33, 'D#2': 622.25,
+      'E2': 659.25, 'F2': 698.46, 'F#2': 739.99, 'G2': 783.99,
+      'G#2': 830.61, 'A2': 880.00, 'A#2': 932.33, 'B2': 987.77
+    };
 
-  const intervals = [0, 4, 7]; // root, major 3rd, perfect 5th
-  const result = [];
+    // 음계 배열
+    const noteOrder = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
-  for (let intv of intervals) {
-    const noteIdx = (idx + intv) % 12;
-    const octaveShift = Math.floor((idx + intv) / 12);
-    const note = NOTES[noteIdx];
-    const octave = rootOctave + octaveShift;
-    result.push({note, octave});
-  }
-
-  return result;
-}
-
-function playChord(rootNote, rootOctave) {
-  const chord = getChordNotes(rootNote, rootOctave);
-  chord.forEach(n => {
-    const key = n.note + n.octave;
-    const buffer = audioBuffers[key];
-    if (buffer) {
-      const src = audioCtx.createBufferSource();
-      src.buffer = buffer;
-      src.connect(audioCtx.destination);
-      src.start();
-    } else {
-      console.warn("음원 없음:", key);
+    // 특정 음에서 반음 간격만큼 떨어진 음 찾기
+    function getNoteByInterval(rootNote, semitones) {
+      const rootIndex = noteOrder.indexOf(rootNote);
+      let targetIndex = (rootIndex + semitones) % 12;
+      // 음수 인덱스 처리
+      if (targetIndex < 0) targetIndex += 12;
+      
+      const octaveShift = Math.floor((rootIndex + semitones) / 12);
+      const targetNote = noteOrder[targetIndex];
+      return octaveShift > 0 ? targetNote + '2' : targetNote;
     }
-  });
-}
 
-function createPiano() {
-  const piano = document.getElementById("piano");
-  piano.innerHTML = "";
-  const whiteNotes = ['C','D','E','F','G','A','B'];
-  const blackPattern = ['C#','D#',null,'F#','G#','A#',null];
+    // 화음 생성 함수
+    function getChord(rootNote, chordType) {
+      let intervals, chordName;
+      
+      if (chordType === 'tonic') {
+        // 으뜸화음 (I): 1도-3도-5도 (0, 4, 7 반음)
+        intervals = [0, 4, 7];
+        chordName = `${rootNote} 으뜸화음 (I)`;
+      } else if (chordType === 'subdominant') {
+        // 버금딸림화음 (IV): 해당 음을 5도로 하는 화음
+        // F의 버금딸림화음 = C-F-A (C가 4도, F가 으뜸음)
+        intervals = [5, 0, 4]; // 아래 5도 + 으뜸음 + 위 3도
+        const subdominantRoot = getNoteByInterval(rootNote, 5);
+        chordName = `${rootNote} 버금딸림화음 (IV)`;
+      } else if (chordType === 'dominant') {
+        // 딸림화음 (V): 해당 음을 으뜸음으로 하는 5도 위 화음
+        intervals = [7, 11, 14]; // 5도 + 7도 + 9도(2도)
+        chordName = `${rootNote} 딸림화음 (V)`;
+      }
 
-  const whiteKeys = [];
-  for (let o = 4; o <= 5; o++) {
-    for (const wn of whiteNotes) whiteKeys.push({note: wn, octave: o});
-  }
-  whiteKeys.push({note: 'C', octave: 6});
-
-  piano.style.display = 'block';
-  piano.style.width = (whiteKeys.length * 60) + 'px';
-  piano.style.height = '240px';
-  piano.style.position = 'relative';
-
-  // white
-  whiteKeys.forEach((k, i) => {
-    const w = document.createElement('div');
-    w.classList.add('key', 'white');
-    w.style.position = 'absolute';
-    w.style.left = (i * 60) + 'px';
-    w.dataset.note = k.note;
-    w.dataset.octave = k.octave;
-    w.innerHTML = `<div class="note-label">${k.note}${k.octave}</div>`;
-    w.addEventListener('mousedown', () => {
-      w.classList.add('playing');
-      playChord(k.note, k.octave);
-    });
-    w.addEventListener('mouseup', () => w.classList.remove('playing'));
-    w.addEventListener('mouseleave', () => w.classList.remove('playing'));
-    piano.appendChild(w);
-  });
-
-  // black
-  for (let oIndex = 0; oIndex < 2; oIndex++) {
-    const baseOctave = 4 + oIndex;
-    for (let i = 0; i < blackPattern.length; i++) {
-      const bn = blackPattern[i];
-      if (!bn) continue;
-      const whiteIndex = oIndex * 7 + i;
-      const left = (whiteIndex * 60) + 45;
-      const b = document.createElement('div');
-      b.classList.add('key', 'black');
-      b.style.position = 'absolute';
-      b.style.left = left + 'px';
-      b.dataset.note = bn;
-      b.dataset.octave = baseOctave;
-      b.innerHTML = `<div class="note-label">${bn}${baseOctave}</div>`;
-      b.addEventListener('mousedown', () => {
-        b.classList.add('playing');
-        playChord(bn, baseOctave);
+      const notes = intervals.map(interval => getNoteByInterval(rootNote, interval));
+      const freqs = notes.map(note => {
+        const freq = frequencies[note];
+        if (!freq) {
+          console.error(`주파수를 찾을 수 없습니다: ${note}`);
+          return frequencies[rootNote]; // 기본값 반환
+        }
+        return freq;
       });
-      b.addEventListener('mouseup', () => b.classList.remove('playing'));
-      b.addEventListener('mouseleave', () => b.classList.remove('playing'));
-      piano.appendChild(b);
+      
+      return { frequencies: freqs, name: chordName, notes: notes };
     }
-  }
-}
 
-document.getElementById("startAudio").addEventListener("click", async () => {
-  if (!isStarted) {
-    audioCtx = new AudioContext();
-    isStarted = true;
-    await preload();
-    alert("피아노가 준비되었습니다!");
-  }
-});
+    function playChord(freqs, duration = 1.5) {
+      freqs.forEach((frequency, index) => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
 
-createPiano();
-</script>
+        oscillator.type = 'triangle';
+        oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+
+        const baseVolume = index === 0 ? 0.25 : 0.15;
+        
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(baseVolume, audioContext.currentTime + 0.02);
+        gainNode.gain.exponentialRampToValueAtTime(baseVolume * 0.5, audioContext.currentTime + 0.2);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + duration);
+      });
+    }
+
+    // 화음 선택 버튼
+    document.querySelectorAll('.chord-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.chord-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedChordType = btn.dataset.chord;
+      });
+    });
+
+    // 건반 클릭
+    document.querySelectorAll('.key').forEach(key => {
+      key.addEventListener('click', () => {
+        const note = key.dataset.note;
+        const chord = getChord(note, selectedChordType);
+        
+        if (audioContext.state === 'suspended') {
+          audioContext.resume();
+        }
+        
+        key.classList.add('playing');
+        setTimeout(() => key.classList.remove('playing'), 300);
+        
+        const noteNames = chord.notes.map(n => n.replace('2', '')).join(' - ');
+        chordDisplay.textContent = `${chord.name}: ${noteNames}`;
+        
+        playChord(chord.frequencies);
+      });
+
+      key.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+      });
+    });
+
+    // 키보드 지원
+    const keyMap = {
+      'a': 'C', 'w': 'C#', 's': 'D', 'e': 'D#',
+      'd': 'E', 'f': 'F', 't': 'F#', 'g': 'G',
+      'y': 'G#', 'h': 'A', 'u': 'A#', 'j': 'B'
+    };
+
+    document.addEventListener('keydown', (e) => {
+      const note = keyMap[e.key.toLowerCase()];
+      if (note) {
+        const key = document.querySelector(`[data-note="${note}"]`);
+        if (key && !key.classList.contains('playing')) {
+          key.click();
+        }
+      }
+    });
+  </script>
+
 </body>
 </html>
