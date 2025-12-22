@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
@@ -18,156 +17,153 @@
       padding: 20px;
     }
 
-```
-h1 {
-  color: white;
-  margin-bottom: 20px;
-  font-size: 2em;
-  text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-}
+    h1 {
+      color: white;
+      margin-bottom: 20px;
+      font-size: 2em;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
 
-.chord-selector {
-  background: rgba(255,255,255,0.15);
-  padding: 20px;
-  border-radius: 10px;
-  margin-bottom: 30px;
-  backdrop-filter: blur(10px);
-  display: flex;
-  gap: 15px;
-  align-items: center;
-}
+    .chord-selector {
+      background: rgba(255,255,255,0.15);
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 30px;
+      backdrop-filter: blur(10px);
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
 
-.chord-selector label {
-  color: white;
-  font-weight: bold;
-  font-size: 16px;
-}
+    .chord-selector label {
+      color: white;
+      font-weight: bold;
+      font-size: 16px;
+    }
 
-.chord-btn {
-  background: rgba(255,255,255,0.2);
-  color: white;
-  border: 2px solid rgba(255,255,255,0.3);
-  padding: 10px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.3s;
-  font-weight: bold;
-}
+    .chord-btn {
+      background: rgba(255,255,255,0.2);
+      color: white;
+      border: 2px solid rgba(255,255,255,0.3);
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s;
+      font-weight: bold;
+    }
 
-.chord-btn:hover {
-  background: rgba(255,255,255,0.3);
-  transform: translateY(-2px);
-}
+    .chord-btn:hover {
+      background: rgba(255,255,255,0.3);
+      transform: translateY(-2px);
+    }
 
-.chord-btn.active {
-  background: #4CAF50;
-  border-color: #45a049;
-  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
-}
+    .chord-btn.active {
+      background: #4CAF50;
+      border-color: #45a049;
+      box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+    }
 
-.piano-container {
-  background: #333;
-  padding: 20px 20px 30px 20px;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-}
+    .piano-container {
+      background: #333;
+      padding: 20px 20px 30px 20px;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
 
-.piano {
-  display: flex;
-  position: relative;
-  height: 250px;
-}
+    .piano {
+      display: flex;
+      position: relative;
+      height: 250px;
+    }
 
-.key-container {
-  position: relative;
-  width: 60px;
-}
+    .key-container {
+      position: relative;
+      width: 60px;
+    }
 
-.key {
-  width: 60px;
-  height: 250px;
-  border: 1px solid #000;
-  background: linear-gradient(to bottom, #fff 0%, #f5f5f5 100%);
-  position: absolute;
-  top: 0;
-  left: 0;
-  box-shadow: inset -2px 0 3px rgba(0,0,0,0.2), 0 2px 5px rgba(0,0,0,0.3);
-  cursor: pointer;
-  transition: all 0.1s;
-  border-radius: 0 0 5px 5px;
-}
+    .key {
+      width: 60px;
+      height: 250px;
+      border: 1px solid #000;
+      background: linear-gradient(to bottom, #fff 0%, #f5f5f5 100%);
+      position: absolute;
+      top: 0;
+      left: 0;
+      box-shadow: inset -2px 0 3px rgba(0,0,0,0.2), 0 2px 5px rgba(0,0,0,0.3);
+      cursor: pointer;
+      transition: all 0.1s;
+      border-radius: 0 0 5px 5px;
+    }
 
-.key:hover {
-  background: linear-gradient(to bottom, #f0f0f0 0%, #e5e5e5 100%);
-}
+    .key:hover {
+      background: linear-gradient(to bottom, #f0f0f0 0%, #e5e5e5 100%);
+    }
 
-.key.black {
-  width: 40px;
-  height: 160px;
-  background: linear-gradient(to bottom, #000 0%, #333 100%);
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-  box-shadow: inset -2px 0 3px rgba(255,255,255,0.1), 0 5px 10px rgba(0,0,0,0.5);
-  border-radius: 0 0 3px 3px;
-}
+    .key.black {
+      width: 40px;
+      height: 160px;
+      background: linear-gradient(to bottom, #000 0%, #333 100%);
+      position: absolute;
+      top: 0;
+      left: 100%;
+      transform: translateX(-50%);
+      z-index: 10;
+      box-shadow: inset -2px 0 3px rgba(255,255,255,0.1), 0 5px 10px rgba(0,0,0,0.5);
+      border-radius: 0 0 3px 3px;
+    }
 
-.key.black:hover {
-  background: linear-gradient(to bottom, #222 0%, #444 100%);
-}
+    .key.black:hover {
+      background: linear-gradient(to bottom, #222 0%, #444 100%);
+    }
 
-.key:active, .key.playing {
-  transform: translateY(2px);
-  box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);
-}
+    .key:active, .key.playing {
+      transform: translateY(2px);
+      box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);
+    }
 
-.key.black:active, .key.black.playing {
-  transform: translateX(-50%) translateY(2px);
-  background: linear-gradient(to bottom, #444 0%, #555 100%);
-}
+    .key.black:active, .key.black.playing {
+      transform: translateX(-50%) translateY(2px);
+      background: linear-gradient(to bottom, #444 0%, #555 100%);
+    }
 
-.note-label {
-  position: absolute;
-  bottom: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 12px;
-  color: #666;
-  font-weight: bold;
-}
+    .note-label {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      color: #666;
+      font-weight: bold;
+    }
 
-.key.black .note-label {
-  color: #ccc;
-  bottom: 5px;
-  font-size: 10px;
-}
+    .key.black .note-label {
+      color: #ccc;
+      bottom: 5px;
+      font-size: 10px;
+    }
 
-.chord-display {
-  background: rgba(255,255,255,0.1);
-  padding: 15px 30px;
-  border-radius: 10px;
-  margin-top: 20px;
-  color: white;
-  font-size: 18px;
-  min-height: 30px;
-  backdrop-filter: blur(10px);
-  text-align: center;
-}
+    .chord-display {
+      background: rgba(255,255,255,0.1);
+      padding: 15px 30px;
+      border-radius: 10px;
+      margin-top: 20px;
+      color: white;
+      font-size: 18px;
+      min-height: 30px;
+      backdrop-filter: blur(10px);
+      text-align: center;
+    }
 
-.instructions {
-  color: white;
-  margin-top: 20px;
-  text-align: center;
-  font-size: 14px;
-  opacity: 0.8;
-  max-width: 600px;
-  line-height: 1.6;
-}
-```
-
+    .instructions {
+      color: white;
+      margin-top: 20px;
+      text-align: center;
+      font-size: 14px;
+      opacity: 0.8;
+      max-width: 600px;
+      line-height: 1.6;
+    }
   </style>
 </head>
 <body>
@@ -192,64 +188,61 @@ h1 {
           <span class="note-label">C#</span>
         </div>
       </div>
-
-```
-  <!-- D -->
-  <div class="key-container">
-    <div class="key" data-note="D">
-      <span class="note-label">D</span>
+      
+      <!-- D -->
+      <div class="key-container">
+        <div class="key" data-note="D">
+          <span class="note-label">D</span>
+        </div>
+        <div class="key black" data-note="D#">
+          <span class="note-label">D#</span>
+        </div>
+      </div>
+      
+      <!-- E -->
+      <div class="key-container">
+        <div class="key" data-note="E">
+          <span class="note-label">E</span>
+        </div>
+      </div>
+      
+      <!-- F -->
+      <div class="key-container">
+        <div class="key" data-note="F">
+          <span class="note-label">F</span>
+        </div>
+        <div class="key black" data-note="F#">
+          <span class="note-label">F#</span>
+        </div>
+      </div>
+      
+      <!-- G -->
+      <div class="key-container">
+        <div class="key" data-note="G">
+          <span class="note-label">G</span>
+        </div>
+        <div class="key black" data-note="G#">
+          <span class="note-label">G#</span>
+        </div>
+      </div>
+      
+      <!-- A -->
+      <div class="key-container">
+        <div class="key" data-note="A">
+          <span class="note-label">A</span>
+        </div>
+        <div class="key black" data-note="A#">
+          <span class="note-label">A#</span>
+        </div>
+      </div>
+      
+      <!-- B -->
+      <div class="key-container">
+        <div class="key" data-note="B">
+          <span class="note-label">B</span>
+        </div>
+      </div>
     </div>
-    <div class="key black" data-note="D#">
-      <span class="note-label">D#</span>
-    </div>
-  </div>
-  
-  <!-- E -->
-  <div class="key-container">
-    <div class="key" data-note="E">
-      <span class="note-label">E</span>
-    </div>
-  </div>
-  
-  <!-- F -->
-  <div class="key-container">
-    <div class="key" data-note="F">
-      <span class="note-label">F</span>
-    </div>
-    <div class="key black" data-note="F#">
-      <span class="note-label">F#</span>
-    </div>
-  </div>
-  
-  <!-- G -->
-  <div class="key-container">
-    <div class="key" data-note="G">
-      <span class="note-label">G</span>
-    </div>
-    <div class="key black" data-note="G#">
-      <span class="note-label">G#</span>
-    </div>
-  </div>
-  
-  <!-- A -->
-  <div class="key-container">
-    <div class="key" data-note="A">
-      <span class="note-label">A</span>
-    </div>
-    <div class="key black" data-note="A#">
-      <span class="note-label">A#</span>
-    </div>
-  </div>
-  
-  <!-- B -->
-  <div class="key-container">
-    <div class="key" data-note="B">
-      <span class="note-label">B</span>
-    </div>
-  </div>
-</div>
-```
-
   </div>
 
   <div class="chord-display" id="chordDisplay">화음을 선택하고 건반을 클릭하세요</div>
